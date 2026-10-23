@@ -53,6 +53,7 @@ function Package {
         ErrorAction = 'SilentlyContinue'
         Path = @(
             "${ProjectRoot}/release/${ProductName}-*-windows-*.zip"
+            "${ProjectRoot}/release/${ProductName}-*-windows-*.exe"
         )
     }
 
@@ -66,6 +67,36 @@ function Package {
         Verbose = ($Env:CI -ne $null)
     }
     Compress-Archive -Force @CompressArgs
+    Log-Group
+
+    Log-Group "Building installer for ${ProductName}..."
+    $Iscc = (Get-Command iscc.exe -ErrorAction SilentlyContinue).Source
+    if ( -not $Iscc ) {
+        $Iscc = @(
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+            "${env:ProgramFiles}\Inno Setup 6\ISCC.exe"
+        ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+    }
+    if ( -not $Iscc ) {
+        choco install innosetup --yes --no-progress | Out-Host
+        $Iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+    }
+    if ( -not ( Test-Path $Iscc ) ) {
+        throw "Inno Setup compiler (ISCC.exe) not found"
+    }
+    $IsccArgs = @(
+        '/Qp'
+        "/DPluginName=${ProductName}"
+        "/DPluginVersion=${ProductVersion}"
+        "/DSourceDir=${ProjectRoot}\release\${Configuration}\${ProductName}"
+        "/DOutputDir=${ProjectRoot}\release"
+        "/DOutputName=${OutputName}-Installer"
+        "${ProjectRoot}\build-aux\installer-windows.iss"
+    )
+    & $Iscc @IsccArgs
+    if ( $LASTEXITCODE -ne 0 ) {
+        throw "ISCC failed with exit code ${LASTEXITCODE}"
+    }
     Log-Group
 }
 

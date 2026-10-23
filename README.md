@@ -85,10 +85,31 @@ Plugin preferences live in `~/.config/obs-studio/plugin_config/matchframe-multiv
 The binary is built against OBS **30.2.3** headers. OBS plugins are not ABI-guaranteed
 across major versions, so build from source for any other OBS version (see §8).
 
-### Windows / macOS
+### Windows (x64, OBS 30 or newer)
 
-**Not built or tested.** The template's build scripts and CMake presets are intact
-(`windows-x64`, `macos`). See §8 and docs/COMPATIBILITY.md.
+Built by CI on GitHub's `windows-2022` runners (MSVC, against OBS 31.1.1 from
+`buildspec.json`). **Compiled, not runtime-tested.**
+
+* **Installer:** run `matchframe-multiview-1.0.0-windows-x64-Installer.exe`. Close OBS first.
+  It installs into `%ProgramData%\obs-studio\plugins\matchframe-multiview\`, which OBS 30+
+  loads automatically, and registers an uninstaller under *Settings → Apps*.
+* **Manual:** extract `matchframe-multiview-1.0.0-windows-x64.zip` into
+  `%ProgramData%\obs-studio\plugins\`. To uninstall, delete that folder.
+
+### macOS (universal: Apple silicon + Intel, OBS 30 or newer)
+
+Built by CI on GitHub's `macos-15` runners. **Compiled, not runtime-tested.**
+
+* **Installer:** open `matchframe-multiview-1.0.0-macos-universal.pkg`. It installs
+  `matchframe-multiview.plugin` into `~/Library/Application Support/obs-studio/plugins/`.
+  The package is **unsigned and not notarized**, because no Apple Developer ID is set up in CI.
+  macOS will block it the first time: right-click (or Control-click) the `.pkg` and choose
+  **Open**, or allow it in *System Settings → Privacy & Security*.
+* **Uninstall:** delete `~/Library/Application Support/obs-studio/plugins/matchframe-multiview.plugin`.
+
+To sign and notarize the macOS package, and optionally sign the Windows installer, add the
+template's codesigning secrets to the repository (see the obs-plugintemplate documentation).
+The workflow uses them automatically.
 
 ## 3. First-time setup
 
@@ -255,8 +276,11 @@ Options:
   inert unless `MATCHFRAME_SELFTEST_OUT` is set).
 
 Windows / macOS follow the template (`cmake --preset windows-x64` / `macos`, which
-downloads the OBS 31.1.1 sources and obs-deps pinned in `buildspec.json`). They're
-untested; `src/render-surface.cpp` contains the native-window handling for each platform.
+downloads the OBS 31.1.1 sources and obs-deps pinned in `buildspec.json`). Installers come
+from CI. On a pull request labelled `Seeking Testers`, or on a pushed tag, the workflow
+builds the `.deb`, the macOS `.pkg` and the Windows `.zip` + Inno Setup `-Installer.exe`
+(`build-aux/installer-windows.iss`), and uploads them as run artifacts. A tag also turns
+them into a draft GitHub Release.
 
 ## 9. Testing
 
