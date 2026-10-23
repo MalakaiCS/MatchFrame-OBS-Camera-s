@@ -145,6 +145,12 @@ PlaybackAction PlaybackSlotLogic::observe(const MediaObservation &obs, int64_t n
 		return PlaybackAction::None;
 
 	if (onProgram_) {
+		if (startPendingSinceMs_ >= 0) {
+			if (obs.state == MediaState::Playing || nowMs - startPendingSinceMs_ > kStartGraceMs)
+				startPendingSinceMs_ = -1;
+			else
+				return PlaybackAction::None; // restart requested, not applied by OBS yet
+		}
 		// While live, report what the media source is actually doing.
 		switch (obs.state) {
 		case MediaState::Playing:
@@ -235,7 +241,6 @@ PlaybackAction PlaybackSlotLogic::observe(const MediaObservation &obs, int64_t n
 
 PlaybackAction PlaybackSlotLogic::onProgramEnter(int64_t nowMs)
 {
-	(void)nowMs;
 	if (onProgram_)
 		return PlaybackAction::None; // already live: never restart
 	onProgram_ = true;
@@ -245,6 +250,7 @@ PlaybackAction PlaybackSlotLogic::onProgramEnter(int64_t nowMs)
 		return PlaybackAction::None;
 	// Start from the beginning on actual Program entry (plugin CUT or native OBS take).
 	state_ = PlaybackState::Playing;
+	startPendingSinceMs_ = nowMs;
 	return PlaybackAction::Restart;
 }
 
@@ -253,6 +259,7 @@ PlaybackAction PlaybackSlotLogic::onProgramExit(bool sourceStillActive, int64_t 
 	if (!onProgram_)
 		return PlaybackAction::None;
 	onProgram_ = false;
+	startPendingSinceMs_ = -1;
 	if (sourceStillActive) {
 		// Still used elsewhere in the output: do not stop that use.
 		activeElsewhere_ = true;
@@ -281,6 +288,7 @@ PlaybackAction PlaybackSlotLogic::transport(PlaybackAction what)
 		return PlaybackAction::None;
 	if (what != PlaybackAction::PlayPause && what != PlaybackAction::Restart)
 		return PlaybackAction::None;
+	startPendingSinceMs_ = -1;
 	if (!onProgram_) {
 		// Off-air transport: the slot is no longer at its armed first frame.
 		arm_ = ArmStep::None;
@@ -298,6 +306,7 @@ void PlaybackSlotLogic::reset()
 	arm_ = ArmStep::None;
 	onProgram_ = false;
 	activeElsewhere_ = false;
+	startPendingSinceMs_ = -1;
 }
 
 void PlaybackSlotLogic::markError(const std::string &why)

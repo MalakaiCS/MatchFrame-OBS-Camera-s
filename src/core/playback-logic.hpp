@@ -98,6 +98,10 @@ private:
 	int repauseCount_ = 0;
 	bool onProgram_ = false;
 	bool activeElsewhere_ = false;
+	// libobs applies media actions on its next tick: after a Restart, keep reporting
+	// PLAYING until the source confirms it (or this grace period expires).
+	int64_t startPendingSinceMs_ = -1;
+	static constexpr int64_t kStartGraceMs = 1500;
 };
 
 // Formats milliseconds as m:ss (or h:mm:ss).

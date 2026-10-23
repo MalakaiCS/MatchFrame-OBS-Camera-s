@@ -844,23 +844,28 @@ private:
 			[this]() {
 				startedBefore_ = g_replayStarted;
 				firstLiveTime_ = -1;
+				takeMs_ = nowMs();
 				ctl()->cut();
 				mark("replay_on_program");
 			},
 			[this]() {
+				OBSSourceAutoRelease m = media(kSlotReplay);
 				if (programIs(kSlotReplay) && firstLiveTime_ < 0 &&
-				    pbState(kSlotReplay) == PlaybackState::Playing)
+				    obs_source_media_get_state(m) == OBS_MEDIA_STATE_PLAYING) {
 					firstLiveTime_ = mediaTime(kSlotReplay);
+					firstLiveAt_ = nowMs() - takeMs_;
+				}
 				return firstLiveTime_ >= 0;
 			},
 			3000);
 		add("C19 verify", [this, expectedLastCam]() {
 			OBSSourceAutoRelease r = media(kSlotReplay);
 			check("C19", "CUT takes the armed replay to Program and starts it from the beginning",
-			      programIs(kSlotReplay) && obs_source_active(r) && firstLiveTime_ < 700 &&
+			      programIs(kSlotReplay) && obs_source_active(r) && firstLiveTime_ <= firstLiveAt_ + 250 &&
 				      g_replayStarted - startedBefore_ == 1,
-			      QString("first live time %1 ms, starts=%2")
+			      QString("media time %1 ms observed %2 ms after the take, starts=%3")
 				      .arg(firstLiveTime_)
+				      .arg(firstLiveAt_)
 				      .arg(g_replayStarted - startedBefore_));
 			lastTime_ = mediaTime(kSlotReplay);
 			monotonic_ = true;
@@ -1373,7 +1378,7 @@ private:
 	int sceneChangedBefore_ = 0, programChanges_ = 0, repeatAccepted_ = 0, repeatDropped_ = 0;
 	std::string lastProgramSeen_;
 	bool replayLoadOk_ = false, highlightsLoadOk_ = false;
-	int64_t offAirMaxTime_ = 0, firstLiveTime_ = -1, lastTime_ = 0;
+	int64_t offAirMaxTime_ = 0, firstLiveTime_ = -1, lastTime_ = 0, takeMs_ = 0, firstLiveAt_ = 0;
 	bool offAirActive_ = false, monotonic_ = true;
 	int startedBefore_ = 0, hlStartedBefore_ = 0;
 	uint64_t framesBefore_ = 0;

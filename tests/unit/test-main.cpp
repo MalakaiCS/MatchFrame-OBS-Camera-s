@@ -423,10 +423,37 @@ TEST(playback_native_take_and_live_states)
 	armToReady(l, now);
 	// Native OBS take (bypassing the plugin) is handled identically.
 	CHECK(l.onProgramEnter(now) == PlaybackAction::Restart);
-	CHECK(l.observe(obs(MediaState::Paused, 12000, 3000, true), now + 10) == PlaybackAction::None);
-	CHECK(l.state() == PlaybackState::Paused);
-	CHECK(l.observe(obs(MediaState::Playing, 12000, 3100, true), now + 20) == PlaybackAction::None);
+	CHECK(l.observe(obs(MediaState::Playing, 12000, 30, true), now + 10) == PlaybackAction::None);
 	CHECK(l.state() == PlaybackState::Playing);
+	// Operator pauses the live clip in OBS: reported truthfully.
+	CHECK(l.observe(obs(MediaState::Paused, 12000, 3000, true), now + 3000) == PlaybackAction::None);
+	CHECK(l.state() == PlaybackState::Paused);
+	CHECK(l.observe(obs(MediaState::Playing, 12000, 3100, true), now + 3100) == PlaybackAction::None);
+	CHECK(l.state() == PlaybackState::Playing);
+}
+
+TEST(playback_restart_grace_on_program)
+{
+	PlaybackSlotLogic l;
+	int64_t now = 0;
+	armToReady(l, now);
+	CHECK(l.onProgramEnter(1000) == PlaybackAction::Restart);
+	// OBS applies the restart on its next tick: the source still reports PAUSED briefly.
+	CHECK(l.observe(obs(MediaState::Paused, 12000, 0, true), 1010) == PlaybackAction::None);
+	CHECK(l.state() == PlaybackState::Playing); // no PLAYING -> PAUSED flicker
+	CHECK(l.observe(obs(MediaState::Playing, 12000, 20, true), 1300) == PlaybackAction::None);
+	// Once confirmed, a real pause is reported truthfully.
+	l.observe(obs(MediaState::Paused, 12000, 500, true), 1400);
+	CHECK(l.state() == PlaybackState::Paused);
+	// If OBS never confirms, the grace period ends and the real state is shown.
+	PlaybackSlotLogic m;
+	now = 0;
+	armToReady(m, now);
+	m.onProgramEnter(5000);
+	m.observe(obs(MediaState::Paused, 12000, 0, true), 6000);
+	CHECK(m.state() == PlaybackState::Playing);
+	m.observe(obs(MediaState::Paused, 12000, 0, true), 6600);
+	CHECK(m.state() == PlaybackState::Paused);
 }
 
 TEST(playback_take_of_unready_slot_starts_if_loaded)
