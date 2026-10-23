@@ -66,17 +66,17 @@ read from OBS's real output state.
 
 ### Linux (built and tested: x86_64, OBS 30.2.x)
 
-Per-user install from `dist/matchframe-multiview-1.0.0-linux-x86_64.tar.gz`:
+Per-user install from `dist/matchframe-multiview-1.1.0-linux-x86_64.tar.gz`:
 
 ```bash
 mkdir -p ~/.config/obs-studio/plugins
-tar -xzf matchframe-multiview-1.0.0-linux-x86_64.tar.gz -C ~/.config/obs-studio/plugins
+tar -xzf matchframe-multiview-1.1.0-linux-x86_64.tar.gz -C ~/.config/obs-studio/plugins
 # result: ~/.config/obs-studio/plugins/matchframe-multiview/bin/64bit/matchframe-multiview.so
 #         ~/.config/obs-studio/plugins/matchframe-multiview/data/locale/en-US.ini
 ```
 
-Or install system-wide with the Debian package (`dist/matchframe-multiview-1.0.0-x86_64-linux-gnu.deb`):
-`sudo apt install ./matchframe-multiview-1.0.0-x86_64-linux-gnu.deb`.
+Or install system-wide with the Debian package (`dist/matchframe-multiview-1.1.0-x86_64-linux-gnu.deb`):
+`sudo apt install ./matchframe-multiview-1.1.0-x86_64-linux-gnu.deb`.
 
 Restart OBS. **Tools → MatchFrame Multiview** should appear, and the OBS log should show
 `[matchframe-multiview] plugin loaded successfully`.
@@ -95,17 +95,17 @@ across major versions, so build from source for any other OBS version (see §8).
 Built by CI on GitHub's `windows-2022` runners (MSVC, against OBS 31.1.1 from
 `buildspec.json`). **Compiled, not runtime-tested.**
 
-* **Installer:** run `matchframe-multiview-1.0.0-windows-x64-Installer.exe`. Close OBS first.
+* **Installer:** run `matchframe-multiview-1.1.0-windows-x64-Installer.exe`. Close OBS first.
   It installs into `%ProgramData%\obs-studio\plugins\matchframe-multiview\`, which OBS 30+
   loads automatically, and registers an uninstaller under *Settings → Apps*.
-* **Manual:** extract `matchframe-multiview-1.0.0-windows-x64.zip` into
+* **Manual:** extract `matchframe-multiview-1.1.0-windows-x64.zip` into
   `%ProgramData%\obs-studio\plugins\`. To uninstall, delete that folder.
 
 ### macOS (universal: Apple silicon + Intel, OBS 30 or newer)
 
 Built by CI on GitHub's `macos-15` runners. **Compiled, not runtime-tested.**
 
-* **Installer:** open `matchframe-multiview-1.0.0-macos-universal.pkg`. It installs
+* **Installer:** open `matchframe-multiview-1.1.0-macos-universal.pkg`. It installs
   `matchframe-multiview.plugin` into `~/Library/Application Support/obs-studio/plugins/`.
   The package is **unsigned and not notarized**, because no Apple Developer ID is set up in CI.
   macOS will block it the first time: right-click (or Control-click) the `.pkg` and choose

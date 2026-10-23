@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.1.0 — 2026-10-23
 
 ### Added
 - **MatchFrame Replay Cue integration.** New *Replay / Highlights source* option in Setup.
