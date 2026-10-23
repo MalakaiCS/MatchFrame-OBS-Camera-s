@@ -52,6 +52,9 @@ struct BankConfig {
 	std::string graphicsUrl;  // shared camera graphics output URL (operator supplied)
 	std::string graphicsUuid; // the one shared camera-graphics Browser Source
 	bool graphicsVisible = true;
+	// Camera graphics drawn on Program only: the multiview's camera tiles and Preview pane
+	// show the clean cameras (a filter on the graphics source skips those renders).
+	bool graphicsProgramOnly = true;
 	std::string lastLiveCameraUuid;
 	// Replay / Highlights provider: "builtin" (prepared files in MF — REPLAY / MF — HIGHLIGHTS)
 	// or "replaycue" (drive the MatchFrame Replay Cue plugin and show its scenes).

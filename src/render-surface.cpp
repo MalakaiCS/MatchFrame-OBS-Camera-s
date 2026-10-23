@@ -1,5 +1,7 @@
 #include "render-surface.hpp"
 
+#include "clean-feed.hpp"
+
 #include "obs-util.hpp"
 
 #include <plugin-support.h>
@@ -482,9 +484,10 @@ static void renderInViewport(const Rect &r, uint32_t baseW, uint32_t baseH, obs_
 	gs_projection_push();
 	gs_set_viewport((int)r.x, (int)r.y, (int)r.w, (int)r.h);
 	gs_ortho(0.0f, (float)baseW, 0.0f, (float)baseH, -100.0f, 100.0f);
-	if (source)
+	if (source) {
+		CleanFeedScope clean; // tiles and Preview: camera graphics are drawn on Program only
 		obs_source_video_render(source);
-	else
+	} else
 		obs_render_main_texture();
 	gs_projection_pop();
 	gs_viewport_pop();

@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see <https://www.gnu.org/licenses/>
 */
 
+#include "clean-feed.hpp"
 #include "controller.hpp"
 #ifdef MF_ENABLE_SELFTEST
 #include "selftest.hpp"
@@ -54,6 +55,7 @@ static void frontendSave(obs_data_t *data, bool saving, void *)
 
 bool obs_module_load(void)
 {
+	mf::registerCleanFeedFilter();
 	g_controller = new mf::Controller();
 	g_controller->registerHotkeys();
 

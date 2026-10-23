@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.2.0 — 2026-10-23
+
+### Changed
+- **Camera graphics on Program only.** The multiview's camera tiles and its Preview pane now
+  show the cameras clean, so you can see every camera while a full-screen break graphic is
+  on air. Program, the stream and the recording keep the overlay exactly as before,
+  including cuts, the ON/OFF toggle and Studio Mode.
+  - Setup → *Show camera graphics on Program only*, on by default; untick it for the old
+    behaviour.
+  - It works through a pass-through filter, *MatchFrame: hide in multiview*, which is added
+    automatically to the plugin's graphics sources. It only affects the multiview's own
+    panes; OBS's Preview, projectors and outputs are unchanged.
+- Replay and Highlights still carry no camera graphics: the overlay leaves Program when a
+  replay or the highlights go live and returns with the next camera.
+
 ## v1.1.0 — 2026-10-23
 
 ### Added

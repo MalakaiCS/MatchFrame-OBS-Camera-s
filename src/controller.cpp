@@ -1,5 +1,6 @@
 #include "controller.hpp"
 
+#include "clean-feed.hpp"
 #include "multiview-window.hpp"
 
 #include <obs-module.h>
@@ -240,6 +241,25 @@ bool Controller::replayCueSelectRelative(int delta)
 	return replayCueAction("SelectEvent", d);
 }
 
+void Controller::setGraphicsProgramOnly(bool programOnly)
+{
+	cfg_.graphicsProgramOnly = programOnly;
+	applyCleanFeed();
+	emit stateChanged();
+}
+
+void Controller::applyCleanFeed()
+{
+	setCleanFeedEnabled(cfg_.graphicsProgramOnly);
+	// The filter is a no-op when the option is off, so it stays on the sources either way.
+	OBSSourceAutoRelease cam = bank_.cameraGraphics();
+	ensureCleanFeedFilter(cam);
+	for (int slot : {kSlotReplay, kSlotHighlights}) {
+		OBSSourceAutoRelease pg = bank_.playbackGraphics(slot);
+		ensureCleanFeedFilter(pg);
+	}
+}
+
 void Controller::setPlaybackProvider(bool replayCue)
 {
 	cfg_.playbackProvider = replayCue ? "replaycue" : "builtin";
@@ -402,6 +422,7 @@ RepairReport Controller::createOrRepair()
 	// Newly created media sources open their file immediately; (re)arm both slots.
 	playback_.resume(bank_.slotOfScene(program));
 	switch_.reconcile();
+	applyCleanFeed();
 	setMessage(QString("Create / Repair: %1 created, %2 reused, %3 warning(s)")
 			   .arg(r.created)
 			   .arg(r.reused)
@@ -454,6 +475,7 @@ bool Controller::setPlaybackOverlay(int slot, bool enabled, const QString &url, 
 	if (message)
 		*message = QString::fromStdString(msg);
 	emit stateChanged();
+	applyCleanFeed();
 	return ok;
 }
 
@@ -509,6 +531,7 @@ void Controller::resume()
 	OBSSourceAutoRelease program = obs_frontend_get_current_scene();
 	playback_.resume(bank_.slotOfScene(program));
 	switch_.reconcile();
+	applyCleanFeed();
 	obs_log(LOG_INFO, "scene bank %s: %s", cfg_.bankId.c_str(),
 		bank_.anySceneExists() ? "resolved" : "not created yet (use Setup → Create / Repair)");
 	if (cfg_.migratedFromV1)

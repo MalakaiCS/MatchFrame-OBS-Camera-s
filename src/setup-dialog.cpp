@@ -2,6 +2,7 @@
 
 #include "controller.hpp"
 
+#include <QCheckBox>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFormLayout>
@@ -9,6 +10,7 @@
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QScrollArea>
+#include <QSignalBlocker>
 #include <QVBoxLayout>
 
 namespace mf {
@@ -113,6 +115,16 @@ void SetupDialog::build()
 	gl->addWidget(reloadNote, 1, 1, 1, 3);
 	gl->addWidget(graphicsState_, 2, 1, 1, 3);
 	gl->addWidget(canvas_, 3, 1, 1, 3);
+	programOnly_ =
+		new QCheckBox("Show camera graphics on Program only (multiview camera tiles and Preview stay clean)");
+	programOnly_->setToolTip(
+		"Program, recording and stream keep the overlay. The multiview's camera tiles and its "
+		"Preview pane draw the cameras without it, so you can see every camera during a break.");
+	gl->addWidget(programOnly_, 4, 1, 1, 3);
+	connect(programOnly_, &QCheckBox::toggled, this, [this](bool on) {
+		controller_->setGraphicsProgramOnly(on);
+		refreshStatus();
+	});
 	connect(showUrl_, &QPushButton::toggled, this,
 		[this](bool on) { graphicsUrl_->setEchoMode(on ? QLineEdit::Normal : QLineEdit::Password); });
 	connect(applyUrl_, &QPushButton::clicked, this, [this]() {
@@ -274,6 +286,10 @@ void SetupDialog::reload()
 		r.input->setCurrentIndex(sel);
 	}
 	graphicsUrl_->setText(QString::fromStdString(cfg.graphicsUrl));
+	{
+		QSignalBlocker block(programOnly_);
+		programOnly_->setChecked(cfg.graphicsProgramOnly);
+	}
 	for (int k = 0; k < 2; k++) {
 		const int slot = k == 0 ? kSlotReplay : kSlotHighlights;
 		const PlaybackSlotConfig &p = cfg.playback(slot);
