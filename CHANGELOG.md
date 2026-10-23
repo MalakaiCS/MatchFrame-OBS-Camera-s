@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+- **Multiview fills the screen.** The layout now chooses between two arrangements for the
+  window's actual size:
+  - **Wide:** monitors on top; cameras 1–4 + Replay; cameras 5–8 + Highlights.
+  - **Stacked:** the original four rows, with a compact playback row at the bottom.
+
+  On 16:9 and wider screens the wide arrangement drops a row, so Preview/Program and every
+  tile get larger: on a 1080p monitor the monitors grow by about a third. Tall or narrow
+  windows keep the stacked arrangement. The layout is recalculated on every resize,
+  full-screen toggle and screen/DPI change.
+
 ## v1.0.0 — 2026-10-23
 
 First release of MatchFrame Multiview, a native OBS Studio plugin for live sports switching.

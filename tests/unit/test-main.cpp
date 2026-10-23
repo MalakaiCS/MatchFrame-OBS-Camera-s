@@ -8,6 +8,7 @@
 
 #include <obs-data.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <functional>
@@ -84,10 +85,11 @@ static void checkLayoutInvariants(double w, double h, double aspect, double dpr)
 	// Priority: Preview/Program larger than cameras, cameras >= playback tiles.
 	CHECK(l.panes[kPanePreview].video.w > l.panes[kPaneCam1].video.w);
 	CHECK(l.panes[kPaneCam1].video.w >= l.panes[kPaneReplay].video.w);
-	// Row order: top < cam row1 < cam row2 < playback.
+	// Row order: monitors on top, cameras 1-4 above 5-8, playback below the monitors.
 	CHECK(l.panes[kPanePreview].outer.y < l.panes[kPaneCam1].outer.y);
 	CHECK(l.panes[kPaneCam1].outer.y < l.panes[kPaneCam1 + 4].outer.y);
-	CHECK(l.panes[kPaneCam1 + 4].outer.y < l.panes[kPaneReplay].outer.y);
+	CHECK(l.panes[kPanePreview].outer.y < l.panes[kPaneReplay].outer.y);
+	CHECK(l.panes[kPaneReplay].outer.y <= l.panes[kPaneHighlights].outer.y);
 	// Program right of Preview, cameras ordered left to right.
 	CHECK(l.panes[kPaneProgram].outer.x > l.panes[kPanePreview].outer.x);
 	for (int c = 0; c < 3; c++) {
@@ -128,10 +130,70 @@ TEST(layout_uses_space_at_1080p)
 	CHECK(l.valid);
 	// The large monitors must be meaningfully large on a 1080p screen.
 	CHECK(l.panes[kPanePreview].video.w >= 550);
-	// Height is used: bottom row ends near the bottom edge.
-	const Rect &pb = l.panes[kPaneReplay].outer;
-	CHECK(pb.y + pb.h <= in.height);
-	CHECK(pb.y + pb.h >= in.height - 3 * in.spacing - 1);
+	// Height is used: the lowest row ends near the bottom edge.
+	double bottom = 0;
+	for (const auto &g : l.panes)
+		bottom = std::max(bottom, g.outer.y + g.outer.h);
+	CHECK(bottom <= in.height);
+	CHECK(bottom >= in.height - 3 * in.spacing - 1);
+}
+
+TEST(layout_auto_fills_wide_screens)
+{
+	// The operator's case: a 24.5" 1080p monitor, multiview window ~1915 x 850 surface.
+	LayoutInput in;
+	in.width = 1915;
+	in.height = 850;
+	Layout autoL = computeLayout(in);
+	in.mode = LayoutMode::Stacked;
+	Layout stacked = computeLayout(in);
+	in.mode = LayoutMode::Wide;
+	Layout wide = computeLayout(in);
+	CHECK(autoL.valid && stacked.valid && wide.valid);
+	// Wide uses one row fewer, so every pane is larger on a 16:9 screen; Auto picks it.
+	CHECK(wide.panes[kPanePreview].video.w > stacked.panes[kPanePreview].video.w * 1.2);
+	CHECK(autoL.panes[kPanePreview].video.w == wide.panes[kPanePreview].video.w);
+	CHECK(autoL.panes[kPanePreview].video.w >= 700);
+	// Replay ends camera row 1, Highlights ends camera row 2.
+	CHECK(autoL.panes[kPaneReplay].outer.y == autoL.panes[kPaneCam1].outer.y);
+	CHECK(autoL.panes[kPaneHighlights].outer.y == autoL.panes[kPaneCam1 + 4].outer.y);
+	CHECK(autoL.panes[kPaneReplay].outer.x > autoL.panes[kPaneCam1 + 3].outer.x);
+	// Full screen on the same monitor gets bigger still.
+	in.mode = LayoutMode::Auto;
+	in.height = 1000;
+	CHECK(computeLayout(in).panes[kPanePreview].video.w > autoL.panes[kPanePreview].video.w);
+}
+
+TEST(layout_auto_keeps_stacked_for_tall_windows)
+{
+	LayoutInput in;
+	in.width = 1000;
+	in.height = 1400; // portrait / narrow: monitors are width-limited either way
+	Layout l = computeLayout(in);
+	CHECK(l.valid);
+	CHECK(l.panes[kPaneReplay].outer.y > l.panes[kPaneCam1 + 4].outer.y);  // compact bottom row
+	CHECK(l.panes[kPaneCam1].video.w > (in.width - 6 * in.spacing) / 5.0); // 4-across cameras
+}
+
+TEST(layout_modes_all_valid)
+{
+	for (LayoutMode m : {LayoutMode::Auto, LayoutMode::Stacked, LayoutMode::Wide}) {
+		LayoutInput in;
+		in.mode = m;
+		for (double w : {960.0, 1280.0, 1920.0, 2560.0, 3840.0})
+			for (double h : {560.0, 720.0, 1000.0, 1400.0, 2100.0}) {
+				in.width = w;
+				in.height = h;
+				Layout l = computeLayout(in);
+				CHECK(l.valid);
+				for (int i = 0; i < kPaneCount; i++) {
+					CHECK(rectInside(l.panes[i].outer, w, h));
+					for (int j = i + 1; j < kPaneCount; j++)
+						CHECK(!overlaps(l.panes[i].outer, l.panes[j].outer));
+					CHECK_EQ(hitTest(l, l.panes[i].outer.x + 1, l.panes[i].outer.y + 1), i);
+				}
+			}
+	}
 }
 
 TEST(layout_small_and_degenerate)

@@ -52,6 +52,11 @@ surface, with Qt controls kept outside it:
 └ HIGHLIGHTS …                                                                                    ┘
 ```
 
+The layout adapts to the window. On 16:9 and wider screens it switches to a wide
+arrangement: cameras 1–4 + Replay, then cameras 5–8 + Highlights, under the monitors. That
+drops a row, so every pane is larger. Tall windows keep the stacked rows shown above. Use
+**Full Screen** for the largest panes.
+
 Every tile shows its composed OBS scene, graphics included. Tiles carry text **PREVIEW**
 and **LIVE** badges plus green and red borders, so tally never relies on colour alone. The
 red monitor is the Program **bus**. **STREAMING** and **RECORDING** are separate indicators
