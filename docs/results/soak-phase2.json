@@ -1,0 +1,71 @@
+{
+ "browser_source_available": false,
+ "fail": 0,
+ "graphics_source_type": "color_source_v3",
+ "libobs_api_built": "30.2.3",
+ "obs_version": "30.2.3.1-3~bpo24.04.1",
+ "pass": 8,
+ "perf": {},
+ "phase": 2,
+ "qt_runtime": "6.4.2",
+ "recording": "",
+ "results": [
+  {
+   "detail": "owned=10",
+   "id": "P01",
+   "pass": true,
+   "t_ms": 25,
+   "title": "After restart: ten owned scenes and all camera assignments resolve by UUID"
+  },
+  {
+   "detail": "",
+   "id": "P02",
+   "pass": true,
+   "t_ms": 25,
+   "title": "After restart: renamed scene keeps its slot"
+  },
+  {
+   "detail": "",
+   "id": "P03",
+   "pass": true,
+   "t_ms": 25,
+   "title": "After restart: labels, graphics URL and playback files restored"
+  },
+  {
+   "detail": "slot 1",
+   "id": "P04",
+   "pass": true,
+   "t_ms": 25,
+   "title": "After restart: last live camera identity restored"
+  },
+  {
+   "detail": "",
+   "id": "P05",
+   "pass": true,
+   "t_ms": 25,
+   "title": "After restart: saved replay / highlights files are re-armed paused at the first frame"
+  },
+  {
+   "detail": "Camera 1: The MatchFrame scene for this slot is missing - run Create / Repair",
+   "id": "P06",
+   "pass": true,
+   "t_ms": 1324,
+   "title": "Collection switch: the other collection has its own (empty) bank; no stale references used"
+  },
+  {
+   "detail": "",
+   "id": "P07",
+   "pass": true,
+   "t_ms": 3262,
+   "title": "Switching back restores the original bank and switching works"
+  },
+  {
+   "detail": "",
+   "id": "P08",
+   "pass": true,
+   "t_ms": 3262,
+   "title": "Playback re-armed after the collection switch"
+  }
+ ],
+ "timeline": []
+}

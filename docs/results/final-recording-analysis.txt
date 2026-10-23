@@ -1,0 +1,10 @@
+PASS A1: Commentary tone continuous across all camera and playback takes  [present in 100.0% of 100 ms windows over 158 s]
+PASS A2: No replay/highlights audio while Replay waits in Preview (60 s)  [1 kHz 0.0%, 2 kHz 0.0%]
+PASS V1: Program shows the camera (not the clip) during the Preview wait  [(122, 165, 125)]
+PASS A3: Replay audio on Program only after the take  [1 kHz in 100.0% of the replay window]
+PASS A4: No replay audio before its first take (incl. loading / arming)  [1 kHz 0.0% before take]
+PASS V2: Replay starts from its first frame on take (magenta marker visible)  [[(236, 1, 246), (236, 1, 246), (236, 1, 246)]]
+PASS A5: Highlights audio on Program; replay audio stops when it leaves Program  [2 kHz 100.0%, 1 kHz 0.0%]
+PASS V3: Highlights starts from its first frame on take (yellow marker visible)  [[(250, 253, 9), (250, 253, 9), (250, 253, 9)]]
+PASS A6: Highlights audio stops after Return Live  [2 kHz 0.0%]
+recording: <workdir>/rec/2026-10-23 13-33-28.mkv (158.4 s)

@@ -936,6 +936,7 @@ private:
 				      .arg(*expectedLastCam)
 				      .arg(sv.previewSlot));
 		});
+		sleep(3000); // keep Highlights on air long enough for the audio analysis
 		add(
 			"return live",
 			[this]() {
