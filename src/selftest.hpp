@@ -7,6 +7,18 @@
 
 #include <obs-frontend-api.h>
 
+#include <string>
+
 namespace mf {
 void selftestOnEvent(enum obs_frontend_event event);
-}
+
+// Stand-in "ReplayCue" obs-websocket vendor (selftest-fake-replaycue.cpp).
+namespace fakerc {
+void registerVendor(); // call from obs_module_post_load
+int calls(const char *requestType);
+void setReturnWorks(bool works);
+double speed();
+std::string selected();
+bool highlightsPlaying();
+} // namespace fakerc
+} // namespace mf

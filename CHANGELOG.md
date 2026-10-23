@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Added
+- **MatchFrame Replay Cue integration.** New *Replay / Highlights source* option in Setup.
+  With it on, the multiview drives the Replay Cue plugin through its `ReplayCue`
+  obs-websocket vendor requests, called in-process:
+  - the tiles show Replay Cue's Replay and Highlights scenes and live status;
+  - **9** cues the selected replay into Preview, and **CUT** plays it with Replay Cue's own
+    transition;
+  - **0** stages the highlights reel, and **CUT** plays it;
+  - **Return Live** uses Replay Cue's return, falling back to the last live camera;
+  - new panel controls: Instant Replay, Mark IN/OUT, previous/cue/next, Play/Pause,
+    25–100 % slow motion, angle ◀ ▶, Play Highlights.
+
+  The built-in prepared-file playback is unchanged and remains the default.
+
 ### Changed
 - **Multiview fills the screen.** The layout now chooses between two arrangements for the
   window's actual size:

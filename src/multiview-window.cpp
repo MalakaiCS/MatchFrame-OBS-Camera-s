@@ -22,6 +22,8 @@
 #include <QTextEdit>
 #include <QVBoxLayout>
 
+#include <functional>
+
 namespace mf {
 
 static QPushButton *makeButton(const QString &text, QWidget *parent)
@@ -106,10 +108,15 @@ void MultiviewWindow::buildUi()
 	surface_ = new RenderSurface(this);
 	root->addWidget(surface_, 1);
 
-	auto *pbRow = new QHBoxLayout();
+	builtinPanels_ = new QWidget(this);
+	auto *pbRow = new QHBoxLayout(builtinPanels_);
+	pbRow->setContentsMargins(0, 0, 0, 0);
 	pbRow->addWidget(buildPlaybackPanel(kSlotReplay, pb_[0]), 1);
 	pbRow->addWidget(buildPlaybackPanel(kSlotHighlights, pb_[1]), 1);
-	root->addLayout(pbRow);
+	root->addWidget(builtinPanels_);
+	rcPanel_ = buildReplayCuePanel();
+	rcPanel_->hide();
+	root->addWidget(rcPanel_);
 
 	message_ = new QLabel(this);
 	message_->setTextInteractionFlags(Qt::TextSelectableByMouse);
@@ -164,6 +171,139 @@ QWidget *MultiviewWindow::buildPlaybackPanel(int slot, PlaybackUi &ui)
 	connect(ui.play, &QPushButton::clicked, this, [this, slot]() { controller_->playPausePlayback(slot); });
 	connect(ui.restart, &QPushButton::clicked, this, [this, slot]() { controller_->restartPlayback(slot); });
 	return box;
+}
+
+QWidget *MultiviewWindow::buildReplayCuePanel()
+{
+	auto *box = new QWidget(this);
+	box->setObjectName("rcPanel");
+	box->setStyleSheet("#rcPanel{border:1px solid #444;border-radius:3px;}");
+	auto *l = new QVBoxLayout(box);
+	l->setContentsMargins(6, 4, 6, 4);
+	l->setSpacing(3);
+
+	auto *info = new QHBoxLayout;
+	info->addWidget(new QLabel("<b>REPLAY CUE</b> [9 cue · 0 highlights]", box));
+	rcStatus_ = new QLabel(box);
+	rcStatus_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+	rcInfo_ = new QLabel(box);
+	info->addWidget(rcStatus_, 1);
+	info->addWidget(rcInfo_);
+	l->addLayout(info);
+
+	auto button = [&](const QString &text, const QString &tip, QHBoxLayout *row, std::function<void()> fn) {
+		QPushButton *b = makeButton(text, box);
+		b->setToolTip(tip);
+		row->addWidget(b, 1);
+		connect(b, &QPushButton::clicked, this, fn);
+		return b;
+	};
+	auto *row1 = new QHBoxLayout;
+	button("Instant Replay", "Save the last seconds from every camera as a new replay (Replay Cue)", row1,
+	       [this]() {
+		       OBSDataAutoRelease d = obs_data_create();
+		       obs_data_set_bool(d, "play", false);
+		       controller_->replayCueAction("InstantReplay", d);
+	       });
+	button("Mark IN", "Mark the start of a replay", row1, [this]() { controller_->replayCueAction("MarkIn"); });
+	button("Mark OUT", "Mark the end and save the replay", row1,
+	       [this]() { controller_->replayCueAction("MarkOut"); });
+	button("◀ Prev", "Select the previous replay in Replay Cue's list", row1,
+	       [this]() { controller_->replayCueSelectRelative(-1); });
+	button("Cue [9]", "Load the selected replay paused into Preview (then CUT)", row1,
+	       [this]() { controller_->selectSlot(kSlotReplay); });
+	button("Next ▶", "Select the next replay in Replay Cue's list", row1,
+	       [this]() { controller_->replayCueSelectRelative(1); });
+	rcPlayPause_ = button("Play / Pause", "Pause or resume the replay player", row1,
+			      [this]() { controller_->replayCueAction("PlayPause"); });
+	l->addLayout(row1);
+
+	auto *row2 = new QHBoxLayout;
+	for (int pct : {25, 50, 75, 100})
+		button(QString("%1%").arg(pct), "Replay speed (slow motion)", row2, [this, pct]() {
+			OBSDataAutoRelease d = obs_data_create();
+			obs_data_set_double(d, "percent", pct);
+			controller_->replayCueAction("SetSpeed", d);
+		});
+	button("◀ Angle", "Previous camera angle", row2, [this]() { controller_->replayCueAction("PrevAngle"); });
+	button("Angle ▶", "Next camera angle", row2, [this]() { controller_->replayCueAction("NextAngle"); });
+	button("Highlights [0]", "Stage the highlights reel in Preview (then CUT plays it)", row2,
+	       [this]() { controller_->selectSlot(kSlotHighlights); });
+	rcPlayHighlights_ =
+		button("Play Highlights (LIVE)",
+		       "Immediately put the current break's highlights reel on air (Replay Cue's transition)", row2,
+		       [this]() { controller_->replayCueAction("PlayHighlights"); });
+	rcPlayHighlights_->setStyleSheet("QPushButton{background:#7a1010;color:white;}");
+	l->addLayout(row2);
+	return box;
+}
+
+void MultiviewWindow::updateReplayCuePanel()
+{
+	const ReplayCueStatus &st = controller_->replayCue().status();
+	rcStatus_->setText(QString::fromStdString(describeReplayCuePlayback(st)));
+	rcStatus_->setStyleSheet(!st.ok                  ? "QLabel{color:#ff8a65;}"
+				 : st.state == "playing" ? "QLabel{color:#ff8a80;font-weight:bold;}"
+				 : st.cued               ? "QLabel{color:#81c784;font-weight:bold;}"
+							 : "");
+	QStringList info;
+	if (st.ok) {
+		info << (st.armed ? "ARMED" : "not armed");
+		if (st.eventCount >= 0)
+			info << QString("%1 replays").arg(st.eventCount);
+		if (st.pendingReplays > 0)
+			info << QString("%1 saving").arg(st.pendingReplays);
+		if (!st.phaseName.empty())
+			info << QString::fromStdString(st.phaseName);
+	}
+	rcInfo_->setText(info.join(" · "));
+	const auto names = controller_->replayCueScenes();
+	OBSSourceAutoRelease program = obs_frontend_get_current_scene();
+	const std::string pg = nameOf(program);
+	const bool live = !pg.empty() && (pg == names.first || pg == names.second);
+	rcPlayPause_->setText(live ? "Play / Pause (LIVE)" : "Play / Pause");
+	rcPlayPause_->setStyleSheet(live ? "QPushButton{background:#7a1010;color:white;}" : "");
+	for (QPushButton *b : rcPanel_->findChildren<QPushButton *>())
+		b->setEnabled(st.ok);
+}
+
+void MultiviewWindow::replayCuePanes(std::array<PaneSpec, kPaneCount> &panes, const SwitchView &sv)
+{
+	const ReplayCueStatus &st = controller_->replayCue().status();
+	const auto names = controller_->replayCueScenes();
+	const bool sameScene = names.first == names.second;
+	const bool staged = controller_->replayCueHighlightsStaged();
+
+	PaneSpec &r = panes[kPaneReplay];
+	if (!names.first.empty())
+		r.source = obs_get_source_by_name(names.first.c_str());
+	r.title = "REPLAY CUE"; // the status line carries the replay name, angle, speed and time
+	r.status = QString::fromStdString(describeReplayCuePlayback(st));
+	r.preview = !names.first.empty() && sv.previewName == names.first && !(sameScene && staged);
+	r.live = !names.first.empty() && sv.programName == names.first && !(sameScene && st.highlights);
+	r.statusColor = st.state == "playing" ? 0xFFFF8A80 : st.cued ? 0xFF81C784 : 0xFFB0BEC5;
+
+	PaneSpec &h = panes[kPaneHighlights];
+	if (!names.second.empty())
+		h.source = obs_get_source_by_name(names.second.c_str());
+	h.title = QString("HIGHLIGHTS · %1")
+			  .arg(st.phaseName.empty() ? QString("all highlights") : QString::fromStdString(st.phaseName));
+	h.status = st.highlights
+			   ? QString("PLAYING REEL · %1").arg(QString::fromStdString(describeReplayCuePlayback(st)))
+		   : st.inBreak ? QString("BREAK · reel ready")
+				: QString("reel builds during the match");
+	h.preview = !names.second.empty() && sv.previewName == names.second && (staged || !sameScene);
+	h.live = !names.second.empty() && sv.programName == names.second && (st.highlights || !sameScene);
+	h.statusColor = st.highlights ? 0xFFFF8A80 : st.inBreak ? 0xFF81C784 : 0xFFB0BEC5;
+
+	if (!st.ok) {
+		r.status = h.status = QString::fromStdString(st.error.empty() ? "Replay Cue not detected" : st.error);
+		r.statusColor = h.statusColor = 0xFFFF7043;
+	} else if (names.first.empty()) {
+		r.status = h.status = "Replay Cue scene not created yet (play once in Replay Cue)";
+	}
+	r.dimmed = !st.ok || !r.source;
+	h.dimmed = !st.ok || !h.source;
 }
 
 void MultiviewWindow::chooseFile(int slot)
@@ -327,8 +467,15 @@ void MultiviewWindow::refresh()
 	if (!isVisible())
 		return;
 	updateToolbar();
-	updatePlayback(kSlotReplay, pb_[0]);
-	updatePlayback(kSlotHighlights, pb_[1]);
+	const bool rc = controller_->replayCueMode();
+	builtinPanels_->setVisible(!rc);
+	rcPanel_->setVisible(rc);
+	if (rc) {
+		updateReplayCuePanel();
+	} else {
+		updatePlayback(kSlotReplay, pb_[0]);
+		updatePlayback(kSlotHighlights, pb_[1]);
+	}
 	updatePanes();
 	surface_->purgeGraveyard();
 }
@@ -532,6 +679,8 @@ void MultiviewWindow::updatePanes()
 	}
 
 	for (int slot : {kSlotReplay, kSlotHighlights}) {
+		if (c->replayCueMode())
+			break;
 		PaneSpec &p = panes[slot == kSlotReplay ? kPaneReplay : kPaneHighlights];
 		PlaybackView v = c->playback().view(slot);
 		p.source = bank.slotScene(slot);
@@ -561,6 +710,9 @@ void MultiviewWindow::updatePanes()
 		}
 		p.dimmed = !p.source || v.state == PlaybackState::Empty || v.state == PlaybackState::Error;
 	}
+
+	if (c->replayCueMode())
+		replayCuePanes(panes, sv);
 
 	surface_->setPanes(std::move(panes));
 }

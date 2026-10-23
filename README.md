@@ -216,6 +216,40 @@ Camera graphics (live clock/score) are **not** placed on playback scenes, becaus
 clock over a replay would mislead. Each playback scene can instead have its own optional
 overlay URL (e.g. "REPLAY" branding) in Setup, independent of the camera toggle.
 
+### Replay and Highlights from MatchFrame Replay Cue
+
+If you use [MatchFrame Replay Cue](https://github.com/MalakaiCS/MatchFrame-OBS-Replay-Cue) for
+multi-angle instant replays, the multiview can drive it in place of the built-in file
+playback. Choose **Setup… → Replay / Highlights source → MatchFrame Replay Cue**.
+
+* The **Replay** and **Highlights** tiles show Replay Cue's own scenes, with its live status:
+  the replay name, angle, speed, time, ARMED, the number of replays and the match phase.
+  The tiles appear after Replay Cue has created its *Replay* scene, which it does the first
+  time it plays.
+* **9** (or the Replay tile) asks Replay Cue to **cue** the replay selected in its list, or
+  the latest. Replay Cue loads it paused and puts its Replay scene in **Preview**.
+* **CUT** then asks Replay Cue to **play** it. Replay Cue takes it to air with *its own*
+  replay transition (stinger, fade, …), slow motion and angle switching. It also remembers
+  your live camera for its automatic return.
+* **0** (or the Highlights tile) stages the highlights reel for the current break, and
+  **CUT** plays it. **Play Highlights (LIVE)** in the panel puts it on air immediately.
+* **Return Live** asks Replay Cue to return to live with its return transition. If Replay Cue
+  can't (for example the replay was put on air outside Replay Cue and no live scene is set),
+  the multiview cuts to the last live camera itself after about 2.5 s.
+* The panel under the multiview drives Replay Cue directly:
+  - **Instant Replay**, **Mark IN / Mark OUT**;
+  - **◀ Prev / Cue / Next ▶** through its replay list;
+  - **Play / Pause**, which turns red and shows **(LIVE)** when on air;
+  - **25 / 50 / 75 / 100 %** slow motion and **◀ Angle / Angle ▶**.
+* Camera switching, graphics and everything else work exactly as before.
+
+How it connects: Replay Cue publishes an obs-websocket vendor named `ReplayCue`. Because
+both plugins run inside the same OBS, the multiview calls it **in-process** through
+obs-websocket's plugin API. There's no network connection, no password and no extra setup.
+It needs Replay Cue installed (OBS 32.2+) and obs-websocket, which ships with OBS. If Replay
+Cue isn't found, the tiles say so and camera switching is unaffected. If you've renamed
+Replay Cue's scenes, pick them in Setup; by default they're detected automatically.
+
 ## 5. Audio routing (configure in OBS)
 
 * Put **commentary and the master programme mix on OBS global audio devices** (Settings →

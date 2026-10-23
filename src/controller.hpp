@@ -8,6 +8,7 @@
 #include "graphics-controller.hpp"
 #include "multiview-window.hpp"
 #include "playback-controller.hpp"
+#include "replay-cue-link.hpp"
 #include "scene-bank.hpp"
 #include "switch-controller.hpp"
 
@@ -58,6 +59,17 @@ public:
 	bool applyGraphicsUrl(const QString &url, QString *message);
 	bool setPlaybackOverlay(int slot, bool enabled, const QString &url, QString *message);
 
+	// --- MatchFrame Replay Cue provider ---
+	bool replayCueMode() const { return cfg_.playbackProvider == "replaycue"; }
+	ReplayCueLink &replayCue() { return rc_; }
+	std::pair<std::string, std::string> replayCueScenes() const { return ReplayCueLink::scenes(cfg_); }
+	bool replayCueHighlightsStaged() const { return rcHighlightsStaged_; }
+	// Runs a ReplayCue vendor request from a multiview control and reports failures.
+	bool replayCueAction(const char *requestType, obs_data_t *data = nullptr);
+	bool replayCueSelectRelative(int delta);
+	void setPlaybackProvider(bool replayCue);
+	void setReplayCueScenes(const std::string &replay, const std::string &highlights);
+
 	QString slotLabel(int slot) const;
 	bool collectionReady() const { return loaded_ && !suspended_; }
 	bool outputsStreaming() const;
@@ -91,6 +103,10 @@ private:
 	void saveHotkeys();
 	void loadHotkeys();
 
+	bool rcSelect(int slot);
+	bool rcCut(bool *handled);
+	bool rcReturnLive(bool *handled);
+
 	BankConfig cfg_;
 	SceneBank bank_{cfg_};
 	GraphicsController graphics_{bank_};
@@ -105,6 +121,11 @@ private:
 	bool suspended_ = true;
 	bool shutdown_ = false;
 	bool awaitingLoad_ = false;
+	ReplayCueLink rc_;
+	bool rcHighlightsStaged_ = false;
+	int64_t rcDebounceUntil_ = 0;
+	int64_t rcCueRequestedMs_ = -100000;
+	int rcTick_ = 0;
 	std::array<obs_hotkey_id, 12> hotkeys_;
 };
 

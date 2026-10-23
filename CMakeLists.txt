@@ -36,6 +36,8 @@ target_sources(
     src/core/layout.hpp
     src/core/playback-logic.cpp
     src/core/playback-logic.hpp
+    src/core/replay-cue-status.cpp
+    src/core/replay-cue-status.hpp
     src/core/switch-logic.cpp
     src/core/switch-logic.hpp
 )
@@ -88,16 +90,19 @@ target_sources(
     src/plugin-main.cpp
     src/render-surface.cpp
     src/render-surface.hpp
+    src/replay-cue-link.cpp
+    src/replay-cue-link.hpp
     src/scene-bank.cpp
     src/scene-bank.hpp
     src/setup-dialog.cpp
     src/setup-dialog.hpp
     src/switch-controller.cpp
     src/switch-controller.hpp
+    src/third-party/obs-websocket-api.h
 )
 
 if(MF_ENABLE_SELFTEST)
-  target_sources(${CMAKE_PROJECT_NAME} PRIVATE src/selftest.cpp src/selftest.hpp)
+  target_sources(${CMAKE_PROJECT_NAME} PRIVATE src/selftest.cpp src/selftest.hpp src/selftest-fake-replaycue.cpp)
   target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE MF_ENABLE_SELFTEST)
 endif()
 

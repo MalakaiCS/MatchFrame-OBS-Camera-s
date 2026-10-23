@@ -107,6 +107,9 @@ void saveConfig(const BankConfig &cfg, obs_data_t *data)
 	obs_data_set_string(data, "graphics_uuid", cfg.graphicsUuid.c_str());
 	obs_data_set_bool(data, "graphics_visible", cfg.graphicsVisible);
 	obs_data_set_string(data, "last_live_camera_uuid", cfg.lastLiveCameraUuid.c_str());
+	obs_data_set_string(data, "playback_provider", cfg.playbackProvider.c_str());
+	obs_data_set_string(data, "replay_cue_replay_scene", cfg.replayCueReplayScene.c_str());
+	obs_data_set_string(data, "replay_cue_highlights_scene", cfg.replayCueHighlightsScene.c_str());
 
 	obs_data_array_t *cams = obs_data_array_create();
 	for (const auto &c : cfg.cameras) {
@@ -183,6 +186,10 @@ BankConfig loadConfig(obs_data_t *data, const std::string &fallbackBankId)
 	c.graphicsVisible =
 		obs_data_has_user_value(data, "graphics_visible") ? obs_data_get_bool(data, "graphics_visible") : true;
 	c.lastLiveCameraUuid = str(data, "last_live_camera_uuid");
+	if (str(data, "playback_provider") == "replaycue")
+		c.playbackProvider = "replaycue";
+	c.replayCueReplayScene = str(data, "replay_cue_replay_scene");
+	c.replayCueHighlightsScene = str(data, "replay_cue_highlights_scene");
 
 	obs_data_array_t *cams = obs_data_get_array(data, "cameras");
 	size_t n = cams ? obs_data_array_count(cams) : 0;

@@ -45,7 +45,8 @@ if [ ! -e /usr/lib/x86_64-linux-gnu/obs-plugins/obs-browser.so ] && [ ! -e /usr/
   export MATCHFRAME_TEST_GRAPHICS_SOURCE=color_source_v3
 fi
 
-for PHASE in 1 2; do
+for PHASE in ${PHASES:-1 2 3}; do
+  [ "$PHASE" = 3 ] && continue
   echo "== phase $PHASE"
   MATCHFRAME_SELFTEST_PHASE=$PHASE MATCHFRAME_SELFTEST_OUT="$WORK/phase$PHASE.json" \
     timeout "${OBS_TIMEOUT:-1800}" obs --disable-shutdown-check --disable-updater --multi \
@@ -53,4 +54,18 @@ for PHASE in 1 2; do
   cp "$(ls -t "$WORK"/config/obs-studio/logs/*.txt | head -1)" "$WORK/obs-phase$PHASE.log"
   python3 -c "import json,sys; d=json.load(open('$WORK/phase$PHASE.json')); print('phase $PHASE: %d passed, %d failed' % (d['pass'], d['fail']))"
 done
+# Phase 3: Replay Cue provider against the stand-in "ReplayCue" vendor, in a fresh profile.
+if [[ " ${PHASES:-1 2 3} " == *" 3 "* ]]; then
+  echo "== phase 3 (Replay Cue link, stand-in vendor)"
+  rm -rf "$WORK/config3" && mkdir -p "$WORK/config3/obs-studio/plugins"
+  cp -r "$WORK/config/obs-studio/plugins/." "$WORK/config3/obs-studio/plugins/"
+  cp "$WORK/config/obs-studio/global.ini" "$WORK/config3/obs-studio/global.ini"
+  XDG_CONFIG_HOME="$WORK/config3" MATCHFRAME_SELFTEST_FAKE_REPLAYCUE=1 MATCHFRAME_SELFTEST_PHASE=3 \
+    MATCHFRAME_SELFTEST_OUT="$WORK/phase3.json" \
+    timeout "${OBS_TIMEOUT:-1800}" obs --disable-shutdown-check --disable-updater --multi \
+    >"$WORK/obs-phase3.stdout" 2>&1 || echo "obs exited with $?"
+  cp "$(ls -t "$WORK"/config3/obs-studio/logs/*.txt | head -1)" "$WORK/obs-phase3.log"
+  python3 -c "import json; d=json.load(open('$WORK/phase3.json')); print('phase 3: %d passed, %d failed' % (d['pass'], d['fail']))"
+fi
+[[ " ${PHASES:-1 2 3} " == *" 1 "* ]] || exit 0
 python3 "$ROOT/tests/runtime/analyze-recording.py" "$WORK/phase1.json" | tee "$WORK/recording-analysis.txt"

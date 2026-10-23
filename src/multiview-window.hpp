@@ -55,6 +55,9 @@ private:
 	};
 
 	void buildUi();
+	QWidget *buildReplayCuePanel();
+	void updateReplayCuePanel();
+	void replayCuePanes(std::array<PaneSpec, kPaneCount> &panes, const struct SwitchView &sv);
 	QWidget *buildPlaybackPanel(int slot, PlaybackUi &ui);
 	void updatePanes();
 	void updateToolbar();
@@ -77,6 +80,12 @@ private:
 	QLabel *message_ = nullptr;
 	QLabel *warning_ = nullptr;
 	PlaybackUi pb_[2];
+	QWidget *builtinPanels_ = nullptr;
+	QWidget *rcPanel_ = nullptr;
+	QLabel *rcStatus_ = nullptr;
+	QLabel *rcInfo_ = nullptr;
+	QPushButton *rcPlayPause_ = nullptr;
+	QPushButton *rcPlayHighlights_ = nullptr;
 	QPointer<SetupDialog> setupDialog_;
 	bool wasMaximized_ = false;
 };

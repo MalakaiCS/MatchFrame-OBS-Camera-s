@@ -71,6 +71,13 @@ bool obs_module_load(void)
 	return true;
 }
 
+#ifdef MF_ENABLE_SELFTEST
+void obs_module_post_load(void)
+{
+	mf::fakerc::registerVendor(); // obs-websocket vendors must register in post_load
+}
+#endif
+
 void obs_module_unload(void)
 {
 	obs_frontend_remove_event_callback(frontendEvent, nullptr);

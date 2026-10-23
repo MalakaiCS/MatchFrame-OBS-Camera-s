@@ -59,6 +59,11 @@ private:
 	QPushButton *repair_ = nullptr;
 	QLabel *repairNote_ = nullptr;
 	QPlainTextEdit *log_ = nullptr;
+	QComboBox *provider_ = nullptr;
+	QLabel *rcState_ = nullptr;
+	QComboBox *rcReplayScene_ = nullptr;
+	QComboBox *rcHighlightsScene_ = nullptr;
+	void reloadReplayCueScenes();
 	bool loading_ = false;
 };
 

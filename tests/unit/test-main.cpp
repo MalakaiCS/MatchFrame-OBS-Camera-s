@@ -4,6 +4,7 @@
 #include "core/config.hpp"
 #include "core/layout.hpp"
 #include "core/playback-logic.hpp"
+#include "core/replay-cue-status.hpp"
 #include "core/switch-logic.hpp"
 
 #include <obs-data.h>
@@ -789,6 +790,122 @@ TEST(default_names)
 	CHECK_EQ(std::string(defaultPlaybackSceneName(9)), std::string("MF — HIGHLIGHTS"));
 	CHECK(randomId().size() == 16);
 	CHECK(randomId() != randomId());
+}
+
+// =============================================================================
+// MatchFrame Replay Cue link
+
+// Shapes copied from Replay Cue's GetStatus / GetEvents responses (websocket-api.cpp,
+// ReplayController::poll snapshot).
+static const char *kRcStatusJson = R"({"ok":true,"armed":true,"pending_replays":1,
+	"selected_event":"e2",
+	"playback":{"state":"paused","event_id":"e2","event_name":"Goal 1","angle":2,
+		"angle_label":"Cam 2","angle_count":4,"speed":0.5,"position":3.2,"duration":8.0,
+		"cued":true,"highlights":false},
+	"match":{"sport":"football","title":"Match 1: Leeds vs York","phase":1,
+		"phase_name":"Half Time","in_break":true}})";
+
+TEST(replay_cue_status_parse)
+{
+	obs_data_t *d = obs_data_create_from_json(kRcStatusJson);
+	ReplayCueStatus s = parseReplayCueStatus(d);
+	obs_data_release(d);
+	CHECK(s.ok);
+	CHECK(s.armed);
+	CHECK_EQ(s.pendingReplays, 1);
+	CHECK_EQ(s.selectedEvent, std::string("e2"));
+	CHECK_EQ(s.state, std::string("paused"));
+	CHECK_EQ(s.eventName, std::string("Goal 1"));
+	CHECK_EQ(s.angle, 2);
+	CHECK_EQ(s.angleCount, 4);
+	CHECK(std::fabs(s.speed - 0.5) < 1e-9);
+	CHECK(s.cued);
+	CHECK(!s.highlights);
+	CHECK_EQ(s.phaseName, std::string("Half Time"));
+	CHECK(s.inBreak);
+	std::string text = describeReplayCuePlayback(s);
+	CHECK_EQ(text, std::string("CUED Goal 1 · Cam 2 · 50% · 0:03/0:08"));
+
+	obs_data_t *f = obs_data_create_from_json(R"({"ok":false,"error":"Replay Cue is shutting down"})");
+	ReplayCueStatus e = parseReplayCueStatus(f);
+	obs_data_release(f);
+	CHECK(!e.ok);
+	CHECK_EQ(e.error, std::string("Replay Cue is shutting down"));
+	CHECK(!parseReplayCueStatus(nullptr).ok);
+	CHECK_EQ(describeReplayCuePlayback(ReplayCueStatus()), std::string("Replay Cue not available"));
+
+	ReplayCueStatus idle;
+	idle.ok = true;
+	idle.armed = true;
+	CHECK_EQ(describeReplayCuePlayback(idle), std::string("ARMED · no replay loaded"));
+	idle.eventName = "Save";
+	idle.state = "playing";
+	CHECK_EQ(describeReplayCuePlayback(idle), std::string("PLAYING Save"));
+}
+
+TEST(replay_cue_event_count)
+{
+	obs_data_t *d = obs_data_create_from_json(R"({"ok":true,"events":[{"id":"a"},{"id":"b"},{"id":"c"}]})");
+	CHECK_EQ(parseReplayCueEventCount(d), 3);
+	obs_data_release(d);
+	obs_data_t *e = obs_data_create_from_json(R"({"ok":true})");
+	CHECK_EQ(parseReplayCueEventCount(e), -1);
+	obs_data_release(e);
+	CHECK_EQ(parseReplayCueEventCount(nullptr), -1);
+}
+
+TEST(replay_cue_scene_pick)
+{
+	std::vector<SceneCandidate> none = {{"Scene", false}, {"MF — CAM 01", false}};
+	auto p = pickReplayCueScenes(none, "", "");
+	CHECK(p.first.empty() && p.second.empty()); // not created yet
+
+	std::vector<SceneCandidate> def = {{"Scene", false}, {"Replay", true}};
+	p = pickReplayCueScenes(def, "", "");
+	CHECK_EQ(p.first, std::string("Replay"));
+	CHECK_EQ(p.second, std::string("Replay")); // no separate highlights scene: Replay Cue uses the replay scene
+
+	std::vector<SceneCandidate> both = {{"Replay", true}, {"HT Highlights", true}, {"Scene", false}};
+	p = pickReplayCueScenes(both, "", "");
+	CHECK_EQ(p.first, std::string("Replay"));
+	CHECK_EQ(p.second, std::string("HT Highlights"));
+
+	std::vector<SceneCandidate> renamed = {{"Instant", true}, {"Scene", false}};
+	p = pickReplayCueScenes(renamed, "", "");
+	CHECK_EQ(p.first, std::string("Instant"));
+
+	// Configured names win; unknown configured names fall back to detection.
+	p = pickReplayCueScenes(both, "HT Highlights", "Replay");
+	CHECK_EQ(p.first, std::string("HT Highlights"));
+	CHECK_EQ(p.second, std::string("Replay"));
+	p = pickReplayCueScenes(both, "Gone", "Gone too");
+	CHECK_EQ(p.first, std::string("Replay"));
+	CHECK_EQ(p.second, std::string("HT Highlights"));
+
+	// Several extra player scenes: ambiguous, so highlights stays on the replay scene.
+	std::vector<SceneCandidate> many = {{"Replay", true}, {"A", true}, {"B", true}};
+	p = pickReplayCueScenes(many, "", "");
+	CHECK_EQ(p.second, std::string("Replay"));
+}
+
+TEST(replay_cue_config_roundtrip)
+{
+	BankConfig c = makeDefaultConfig("b");
+	CHECK_EQ(c.playbackProvider, std::string("builtin"));
+	c.playbackProvider = "replaycue";
+	c.replayCueReplayScene = "Replay";
+	c.replayCueHighlightsScene = "HT Highlights";
+	obs_data_t *d = obs_data_create();
+	saveConfig(c, d);
+	BankConfig r = loadConfig(d, "x");
+	obs_data_release(d);
+	CHECK_EQ(r.playbackProvider, std::string("replaycue"));
+	CHECK_EQ(r.replayCueReplayScene, std::string("Replay"));
+	CHECK_EQ(r.replayCueHighlightsScene, std::string("HT Highlights"));
+	// Older v2 configs without the field keep the built-in provider; junk values are ignored.
+	obs_data_t *old = obs_data_create_from_json(R"({"version":2,"bank_id":"o","playback_provider":"bogus"})");
+	CHECK_EQ(loadConfig(old, "x").playbackProvider, std::string("builtin"));
+	obs_data_release(old);
 }
 
 int main()

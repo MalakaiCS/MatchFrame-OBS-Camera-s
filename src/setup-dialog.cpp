@@ -186,6 +186,46 @@ void SetupDialog::build()
 	}
 	root->addWidget(pBox);
 
+	// --- Replay / Highlights provider
+	auto *rcBox = new QGroupBox("Replay / Highlights source", this);
+	auto *rl = new QGridLayout(rcBox);
+	provider_ = new QComboBox;
+	provider_->addItem("Built-in: prepared files (MF — REPLAY / MF — HIGHLIGHTS)", false);
+	provider_->addItem("MatchFrame Replay Cue (multi-angle instant replay plugin)", true);
+	rcState_ = new QLabel;
+	rcState_->setWordWrap(true);
+	rcReplayScene_ = new QComboBox;
+	rcHighlightsScene_ = new QComboBox;
+	rl->addWidget(new QLabel("Source:"), 0, 0);
+	rl->addWidget(provider_, 0, 1, 1, 3);
+	rl->addWidget(rcState_, 1, 1, 1, 3);
+	rl->addWidget(new QLabel("Replay Cue Replay scene:"), 2, 0);
+	rl->addWidget(rcReplayScene_, 2, 1);
+	rl->addWidget(new QLabel("Highlights scene:"), 2, 2);
+	rl->addWidget(rcHighlightsScene_, 2, 3);
+	auto *rcNote = new QLabel(
+		"With Replay Cue, the Replay and Highlights tiles show Replay Cue's scenes. 9 cues the selected replay "
+		"into Preview and CUT plays it with Replay Cue's own transition; 0 stages the break's highlights reel. "
+		"Requires Replay Cue (OBS 32.2+) and obs-websocket (built into OBS).");
+	rcNote->setWordWrap(true);
+	rcNote->setStyleSheet("QLabel{color:#9e9e9e;}");
+	rl->addWidget(rcNote, 3, 0, 1, 4);
+	connect(provider_, &QComboBox::activated, this, [this](int) {
+		if (loading_)
+			return;
+		controller_->setPlaybackProvider(provider_->currentData().toBool());
+		refreshStatus();
+	});
+	auto sceneChanged = [this](int) {
+		if (loading_)
+			return;
+		controller_->setReplayCueScenes(rcReplayScene_->currentData().toString().toStdString(),
+						rcHighlightsScene_->currentData().toString().toStdString());
+	};
+	connect(rcReplayScene_, &QComboBox::activated, this, sceneChanged);
+	connect(rcHighlightsScene_, &QComboBox::activated, this, sceneChanged);
+	root->addWidget(rcBox);
+
 	// --- Repair
 	auto *rBox = new QHBoxLayout;
 	repair_ = new QPushButton("Create / Repair MatchFrame Scenes");
@@ -241,8 +281,26 @@ void SetupDialog::reload()
 		pbs_[k].overlayUrl->setText(QString::fromStdString(p.graphicsUrl));
 		pbs_[k].overlayOn->setChecked(p.graphicsEnabled);
 	}
+	provider_->setCurrentIndex(controller_->replayCueMode() ? 1 : 0);
+	reloadReplayCueScenes();
 	loading_ = false;
 	refreshStatus();
+}
+
+void SetupDialog::reloadReplayCueScenes()
+{
+	const BankConfig &cfg = controller_->config();
+	auto fill = [](QComboBox *box, const std::string &current, const QString &autoText) {
+		box->clear();
+		box->addItem(autoText, QString());
+		for (const auto &c : ReplayCueLink::sceneCandidates())
+			box->addItem(QString::fromStdString(c.name) + (c.hasPlayer ? "  (Replay Cue player)" : ""),
+				     QString::fromStdString(c.name));
+		int i = box->findData(QString::fromStdString(current));
+		box->setCurrentIndex(i >= 0 ? i : 0);
+	};
+	fill(rcReplayScene_, cfg.replayCueReplayScene, "Auto (Replay Cue's \"Replay\" scene)");
+	fill(rcHighlightsScene_, cfg.replayCueHighlightsScene, "Auto (Replay Cue's highlights scene)");
 }
 
 void SetupDialog::refreshStatus()
@@ -320,6 +378,29 @@ void SetupDialog::refreshStatus()
 	repairNote_->setText(allowed ? "Idempotent: reuses plugin-owned scenes and sources, preserves manual framing, "
 				       "filters and unrelated sources, and never switches Program or starts outputs."
 				     : why);
+
+	const bool rc = controller_->replayCueMode();
+	rcReplayScene_->setEnabled(rc);
+	rcHighlightsScene_->setEnabled(rc);
+	for (auto &p : pbs_)
+		p.browse->setEnabled(p.browse->isEnabled() && !rc); // files are Replay Cue's in that mode
+	controller_->replayCue().refresh(true);
+	const ReplayCueStatus &st = controller_->replayCue().status();
+	const auto names = controller_->replayCueScenes();
+	if (!st.ok) {
+		rcState_->setText(QString("Replay Cue: not detected (%1)").arg(QString::fromStdString(st.error)));
+		rcState_->setStyleSheet("QLabel{color:#ff8a65;}");
+	} else {
+		rcState_->setText(
+			QString("Replay Cue: connected · %1 · %2 replays · Replay scene: %3 · Highlights scene: %4")
+				.arg(st.armed ? "armed" : "not armed")
+				.arg(st.eventCount)
+				.arg(names.first.empty() ? QString("not created yet")
+							 : QString::fromStdString(names.first))
+				.arg(names.second.empty() ? QString("not created yet")
+							  : QString::fromStdString(names.second)));
+		rcState_->setStyleSheet("QLabel{color:#9ccc65;}");
+	}
 }
 
 void SetupDialog::repair()
