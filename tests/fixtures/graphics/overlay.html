@@ -1,0 +1,20 @@
+<!doctype html>
+<!-- MatchFrame Multiview TEST FIXTURE - not a MatchFrame API. Transparent overlay with a
+     scoreboard, an animated element, a running clock and a per-page-load identifier that
+     is reported to the local fixture server, so camera cuts can be proven not to reload it. -->
+<html>
+<head>
+<meta charset="utf-8">
+<title>MatchFrame test overlay</title>
+<link rel="stylesheet" href="overlay.css">
+</head>
+<body>
+  <div id="bug">
+    <span class="team">HOME</span><span id="score">2 – 1</span><span class="team">AWAY</span>
+    <span id="clock">00:00.0</span>
+  </div>
+  <div id="ticker"><span>MATCHFRAME TEST FIXTURE · sponsor slot · animation keeps running across cuts ·</span></div>
+  <div id="loadid">load <span id="lid"></span> · uptime <span id="up"></span>s</div>
+  <script src="overlay.js"></script>
+</body>
+</html>
