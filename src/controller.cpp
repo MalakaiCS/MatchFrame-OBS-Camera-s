@@ -7,6 +7,9 @@
 #include <util/platform.h>
 
 #include <QFileInfo>
+#include <QTimer>
+
+#include <algorithm>
 #include <QMainWindow>
 #include <QMetaObject>
 
@@ -85,6 +88,8 @@ void Controller::setSlotLabel(int slot, const QString &label)
 
 bool Controller::selectSlot(int slot)
 {
+	if (replayCueMode() && slotIsPlayback(slot))
+		return rcSelect(slot);
 	std::string msg;
 	bool ok = switch_.selectPreview(slot, &msg);
 	if (!ok)
@@ -98,6 +103,14 @@ bool Controller::selectSlot(int slot)
 
 bool Controller::cut()
 {
+	if (replayCueMode()) {
+		bool handled = false;
+		bool ok = rcCut(&handled);
+		if (handled) {
+			emit stateChanged();
+			return ok;
+		}
+	}
 	std::string msg;
 	bool ok = switch_.cut(&msg);
 	if (!ok || !msg.empty())
@@ -108,6 +121,14 @@ bool Controller::cut()
 
 bool Controller::returnLive()
 {
+	if (replayCueMode()) {
+		bool handled = false;
+		bool ok = rcReturnLive(&handled);
+		if (handled) {
+			emit stateChanged();
+			return ok;
+		}
+	}
 	std::string msg;
 	bool ok = switch_.returnLive(&msg);
 	if (!ok)
@@ -180,6 +201,171 @@ bool Controller::restartPlayback(int slot)
 	if (!ok)
 		setMessage(QString::fromStdString(msg), true);
 	emit stateChanged();
+	return ok;
+}
+
+// ---------------------------------------------------------------------------
+// MatchFrame Replay Cue provider
+//
+// Replay Cue owns its replay capture, cue list, player, transitions and highlights reels.
+// The multiview stages its scenes in Preview and asks Replay Cue to take them to air, so
+// Replay Cue's own transitions, slow motion and automatic return still apply.
+
+bool Controller::replayCueAction(const char *requestType, obs_data_t *data)
+{
+	std::string err;
+	bool ok = rc_.action(requestType, data, &err);
+	if (!ok)
+		setMessage(QString::fromStdString(err), true);
+	rc_.refresh(true);
+	emit stateChanged();
+	return ok;
+}
+
+bool Controller::replayCueSelectRelative(int delta)
+{
+	rc_.refresh(true);
+	const auto &ids = rc_.eventIds();
+	if (ids.empty()) {
+		setMessage("Replay Cue has no replays yet", true);
+		return false;
+	}
+	int index = (int)ids.size() - 1; // nothing selected: start from the latest
+	for (size_t i = 0; i < ids.size(); i++)
+		if (ids[i] == rc_.status().selectedEvent)
+			index = (int)i;
+	index = std::clamp(index + delta, 0, (int)ids.size() - 1);
+	OBSDataAutoRelease d = obs_data_create();
+	obs_data_set_string(d, "id", ids[(size_t)index].c_str());
+	return replayCueAction("SelectEvent", d);
+}
+
+void Controller::setPlaybackProvider(bool replayCue)
+{
+	cfg_.playbackProvider = replayCue ? "replaycue" : "builtin";
+	rcHighlightsStaged_ = false;
+	if (replayCue)
+		rc_.refresh(true);
+	obs_log(LOG_INFO, "Replay / Highlights provider: %s", replayCue ? "MatchFrame Replay Cue" : "built-in files");
+	emit stateChanged();
+}
+
+void Controller::setReplayCueScenes(const std::string &replay, const std::string &highlights)
+{
+	cfg_.replayCueReplayScene = replay;
+	cfg_.replayCueHighlightsScene = highlights;
+	emit stateChanged();
+}
+
+bool Controller::rcSelect(int slot)
+{
+	if (!obs_frontend_preview_program_mode_active()) {
+		setMessage(rejectMessage(Reject::StudioModeOff), true);
+		return false;
+	}
+	rc_.refresh(true);
+	if (!rc_.status().ok) {
+		setMessage(QString::fromStdString(rc_.status().error), true);
+		return false;
+	}
+	if (slot == kSlotReplay) {
+		if (rc_.status().eventCount == 0) {
+			setMessage("Replay Cue has no replays yet - press Instant Replay (or Mark IN / OUT)", true);
+			return false;
+		}
+		// Replay Cue loads the selected (else latest) replay paused and puts its Replay
+		// scene in Preview; CUT then asks it to play.
+		rcHighlightsStaged_ = false;
+		bool ok = replayCueAction("CueEvent");
+		if (ok)
+			rcCueRequestedMs_ = nowMs();
+		return ok;
+	}
+	const std::string hl = replayCueScenes().second;
+	OBSSourceAutoRelease scene = hl.empty() ? nullptr : obs_get_source_by_name(hl.c_str());
+	if (!scene || !obs_scene_from_source(scene)) {
+		setMessage("Replay Cue has not created its Replay scene yet - play one replay in Replay Cue first",
+			   true);
+		return false;
+	}
+	obs_frontend_set_current_preview_scene(scene);
+	rcHighlightsStaged_ = true;
+	setMessage(QString("Highlights staged (%1) - CUT plays the reel from Replay Cue")
+			   .arg(QString::fromStdString(rc_.status().phaseName.empty() ? "all highlights"
+										      : rc_.status().phaseName)),
+		   false);
+	emit stateChanged();
+	return true;
+}
+
+bool Controller::rcCut(bool *handled)
+{
+	*handled = false;
+	OBSSourceAutoRelease preview = obs_frontend_get_current_preview_scene();
+	const std::string pv = nameOf(preview);
+	const auto names = replayCueScenes();
+	if (pv.empty() || (pv != names.first && pv != names.second))
+		return false; // not a Replay Cue scene: normal CUT
+	*handled = true;
+	if (nowMs() < rcDebounceUntil_) {
+		setMessage("Replay Cue take already requested", true);
+		return false;
+	}
+	rc_.refresh(false);
+	const ReplayCueStatus &st = rc_.status();
+	OBSSourceAutoRelease program = obs_frontend_get_current_scene();
+	bool ok;
+	if (rcHighlightsStaged_ && pv == names.second) {
+		if (program.Get() == preview.Get() && st.highlights) {
+			setMessage("The highlights reel is already on air", false);
+			return true;
+		}
+		ok = replayCueAction("PlayHighlights");
+		rcHighlightsStaged_ = false;
+	} else {
+		// Replay Cue handles requests in order on its UI thread and refreshes its status
+		// snapshot on its own poll, so right after our CueEvent the status may not show it
+		// yet: a Resume sent now is still processed after the cue.
+		const bool cueJustRequested = nowMs() - rcCueRequestedMs_ < 5000;
+		if (st.eventId.empty() && !st.cued && !cueJustRequested) {
+			setMessage("Nothing is cued in Replay Cue - press 9 (or cue a replay in Replay Cue)", true);
+			return false;
+		}
+		// Replay Cue takes its scene to air with its own replay transition and remembers
+		// the live scene for its automatic / manual return.
+		ok = replayCueAction("Resume");
+	}
+	if (ok)
+		rcDebounceUntil_ = nowMs() + 1500;
+	return ok;
+}
+
+bool Controller::rcReturnLive(bool *handled)
+{
+	*handled = false;
+	OBSSourceAutoRelease program = obs_frontend_get_current_scene();
+	const std::string pg = nameOf(program);
+	const auto names = replayCueScenes();
+	if (pg.empty() || (pg != names.first && pg != names.second))
+		return false;
+	*handled = true;
+	rcDebounceUntil_ = 0;
+	bool ok = replayCueAction("ReturnToLive");
+	// If Replay Cue cannot return (it did not take the scene live itself and has no live
+	// scene configured), cut to the last live camera so the operator is never stuck.
+	QTimer::singleShot(2500, this, [this, names]() {
+		OBSSourceAutoRelease now = obs_frontend_get_current_scene();
+		const std::string n = nameOf(now);
+		if ((n == names.first || n == names.second) && !transitionInProgress()) {
+			std::string msg;
+			if (switch_.returnLive(&msg))
+				setMessage("Replay Cue did not return to live - cut to the last live camera instead",
+					   true);
+			else
+				setMessage(QString("Return Live: %1").arg(QString::fromStdString(msg)), true);
+			emit stateChanged();
+		}
+	});
 	return ok;
 }
 
@@ -294,6 +480,8 @@ void Controller::onTimer()
 		return;
 	switch_.tick();
 	switch_.reconcile();
+	if (replayCueMode() && (rcTick_++ % 3) == 0)
+		rc_.refresh(rcTick_ % 21 == 1); // status ~3x/s, replay list every ~2 s
 	emit stateChanged();
 }
 
@@ -301,6 +489,7 @@ void Controller::suspend()
 {
 	if (suspended_)
 		return;
+	rcHighlightsStaged_ = false;
 	suspended_ = true;
 	switch_.setSuspended(true);
 	playback_.suspend();
@@ -334,6 +523,12 @@ void Controller::onFrontendEvent(enum obs_frontend_event event)
 		return;
 	switch (event) {
 	case OBS_FRONTEND_EVENT_FINISHED_LOADING:
+		rc_.start(this, [this]() {
+			if (replayCueMode() && collectionReady()) {
+				rc_.refresh(true);
+				emit stateChanged();
+			}
+		});
 		loaded_ = true;
 		resume();
 		break;
@@ -358,6 +553,7 @@ void Controller::onFrontendEvent(enum obs_frontend_event event)
 	case OBS_FRONTEND_EVENT_SCENE_CHANGED:
 	case OBS_FRONTEND_EVENT_TRANSITION_STOPPED:
 		switch_.onTransitionFinished();
+		rcDebounceUntil_ = 0; // a Replay Cue take has landed: the next CUT is a new request
 		[[fallthrough]];
 	case OBS_FRONTEND_EVENT_PREVIEW_SCENE_CHANGED:
 	case OBS_FRONTEND_EVENT_STUDIO_MODE_ENABLED:
@@ -405,6 +601,7 @@ void Controller::shutdown()
 		return;
 	shutdown_ = true;
 	timer_.stop();
+	rc_.stop();
 	saveHotkeys();
 	if (window_) {
 		window_->saveGeometryPrefs();

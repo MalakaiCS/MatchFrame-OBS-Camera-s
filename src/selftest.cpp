@@ -15,6 +15,7 @@
 #include "controller.hpp"
 #include "multiview-window.hpp"
 #include "obs-util.hpp"
+#include "core/replay-cue-status.hpp"
 
 #include <obs-frontend-api.h>
 #include <plugin-support.h>
@@ -69,6 +70,8 @@ public:
 		connect(&timer_, &QTimer::timeout, this, [this]() { tick(); });
 		if (phase_ == 2)
 			buildPhase2();
+		else if (phase_ == 3)
+			buildPhase3();
 		else
 			buildPhase1();
 	}
@@ -1285,6 +1288,167 @@ private:
 	}
 
 	// ------------------------------------------------------------------ phase 2
+	// ------------------------------------------------------------------ phase 3
+	// Replay Cue provider, against the stand-in "ReplayCue" vendor (selftest-fake-replaycue.cpp).
+	std::string programName()
+	{
+		OBSSourceAutoRelease p = obs_frontend_get_current_scene();
+		return nameOf(p);
+	}
+	std::string previewName()
+	{
+		OBSSourceAutoRelease p = obs_frontend_get_current_preview_scene();
+		return nameOf(p);
+	}
+
+	void buildPhase3()
+	{
+		auto cams = std::make_shared<std::vector<std::string>>();
+		add(
+			"studio mode", []() { obs_frontend_set_preview_program_mode(true); },
+			[]() { return obs_frontend_preview_program_mode_active(); });
+		add("create cameras", [this, cams]() {
+			obs_scene_t *park = obs_scene_create("Unrelated Test Inputs");
+			for (int i = 1; i <= 2; i++) {
+				OBSDataAutoRelease s = obs_data_create();
+				obs_data_set_string(s, "local_file",
+						    mediaPath(QString("cam%1.mp4").arg(i)).toUtf8().constData());
+				obs_data_set_bool(s, "looping", true);
+				obs_data_set_bool(s, "restart_on_activate", false);
+				OBSSourceAutoRelease src =
+					createInput("ffmpeg_source", QString("TEST CAM %1").arg(i), s);
+				obs_scene_add(park, src);
+				cams->push_back(uuidOf(src));
+			}
+			obs_scene_release(park);
+			QString m;
+			ctl()->assignInput(0, (*cams)[0], &m);
+			ctl()->assignInput(1, (*cams)[1], &m);
+			ctl()->createOrRepair();
+			ctl()->showMultiview();
+		});
+		cutTo(0, "CAM 1");
+
+		add("R01 detect", [this]() {
+			ctl()->setPlaybackProvider(true);
+			ctl()->replayCue().refresh(true);
+			const ReplayCueStatus &s = ctl()->replayCue().status();
+			auto names = ctl()->replayCueScenes();
+			check("R01", "Replay Cue detected in-process through obs-websocket (GetStatus / GetEvents)",
+			      s.ok && s.armed && s.eventCount == 2 && s.phaseName == "Half Time" && names.first.empty(),
+			      QString("ok=%1 events=%2 replay scene='%3' (not created until first play)")
+				      .arg(s.ok)
+				      .arg(s.eventCount)
+				      .arg(QString::fromStdString(names.first)));
+		});
+
+		add(
+			"R02 cue with 9", [this]() { sendKey(Qt::Key_9, false, "9"); },
+			[this]() { return previewName() == "Replay"; }, 4000);
+		add("R02 verify", [this]() {
+			auto names = ctl()->replayCueScenes();
+			check("R02",
+			      "Key 9 asks Replay Cue to cue the selected replay; its Replay scene appears in Preview",
+			      fakerc::calls("CueEvent") == 1 && names.first == "Replay" && programIs(0),
+			      QString("CueEvent calls=%1, preview='%2', program still CAM 1=%3")
+				      .arg(fakerc::calls("CueEvent"))
+				      .arg(QString::fromStdString(previewName()))
+				      .arg(programIs(0)));
+		});
+
+		add("R03 CUT", [this]() { ctl()->cut(); }, [this]() { return programName() == "Replay"; }, 4000);
+		add("R03 verify", [this]() {
+			SwitchView sv = ctl()->switcher().view();
+			check("R03", "CUT on the cued replay asks Replay Cue to play it (Resume); last camera kept",
+			      fakerc::calls("Resume") == 1 && sv.lastCameraSlot == 0 && sv.returnLiveEnabled,
+			      QString("Resume calls=%1 last camera slot=%2")
+				      .arg(fakerc::calls("Resume"))
+				      .arg(sv.lastCameraSlot));
+		});
+		add("R04 Return Live", [this]() { ctl()->returnLive(); }, [this]() { return programIs(0); }, 4000);
+		add("R04 verify", [this]() {
+			check("R04",
+			      "Return Live asks Replay Cue to return (ReturnToLive) and Program goes back to CAM 1",
+			      fakerc::calls("ReturnToLive") == 1 && programIs(0));
+		});
+
+		add(
+			"R05 setup fallback",
+			[this]() {
+				fakerc::setReturnWorks(false);
+				ctl()->selectSlot(kSlotReplay);
+			},
+			[this]() { return previewName() == "Replay"; }, 4000);
+		add("R05 take", [this]() { ctl()->cut(); }, [this]() { return programName() == "Replay"; }, 4000);
+		sleep(1700); // past the CUT debounce
+		add("R05 Return Live", [this]() { ctl()->returnLive(); }, [this]() { return programIs(0); }, 6000);
+		add("R05 verify", [this]() {
+			check("R05", "If Replay Cue cannot return, the multiview cuts to the last live camera itself",
+			      fakerc::calls("ReturnToLive") == 2 && programIs(0) &&
+				      ctl()->lastMessage().contains("did not return"),
+			      ctl()->lastMessage());
+			fakerc::setReturnWorks(true);
+		});
+
+		add(
+			"R06 stage highlights", [this]() { sendKey(Qt::Key_0, false, "0"); },
+			[this]() { return previewName() == "Replay" && ctl()->replayCueHighlightsStaged(); }, 4000);
+		add(
+			"R06 CUT twice",
+			[this]() {
+				ctl()->cut();
+				ctl()->cut(); // double press must not restart the reel
+			},
+			[this]() { return programName() == "Replay"; }, 4000);
+		add("R06 verify", [this]() {
+			check("R06",
+			      "Key 0 stages the highlights reel; CUT plays it once (PlayHighlights), double press ignored",
+			      fakerc::calls("PlayHighlights") == 1 && fakerc::highlightsPlaying() &&
+				      fakerc::calls("Resume") == 2,
+			      QString("PlayHighlights calls=%1").arg(fakerc::calls("PlayHighlights")));
+		});
+		sleep(1700);
+		add("R06 return", [this]() { ctl()->returnLive(); }, [this]() { return programIs(0); }, 4000);
+
+		add("R07 panel controls", [this]() {
+			OBSDataAutoRelease d = obs_data_create();
+			obs_data_set_bool(d, "play", false);
+			bool a = ctl()->replayCueAction("InstantReplay", d);
+			OBSDataAutoRelease sp = obs_data_create();
+			obs_data_set_double(sp, "percent", 50);
+			bool b = ctl()->replayCueAction("SetSpeed", sp);
+			bool c = ctl()->replayCueSelectRelative(-1);
+			bool e = ctl()->replayCueAction("MarkIn") && ctl()->replayCueAction("MarkOut") &&
+				 ctl()->replayCueAction("NextAngle");
+			check("R07",
+			      "Multiview controls drive Replay Cue: Instant Replay, 50% speed, previous replay, marks, angle",
+			      a && b && c && e && fakerc::calls("InstantReplay") == 1 && fakerc::speed() == 0.5 &&
+				      fakerc::selected() == "e1" && fakerc::calls("MarkIn") == 1 &&
+				      fakerc::calls("NextAngle") == 1,
+			      QString("selected=%1 speed=%2")
+				      .arg(QString::fromStdString(fakerc::selected()))
+				      .arg(fakerc::speed()));
+			bool bad = ctl()->replayCueAction("NoSuchRequest");
+			check("R07b", "An unknown / failing Replay Cue request is reported, not ignored",
+			      !bad && ctl()->lastMessage().contains("Replay Cue"), ctl()->lastMessage());
+		});
+
+		cutTo(1, "CAM 2 in Replay Cue mode");
+		add("R08 verify",
+		    [this]() { check("R08", "Camera Preview / CUT is unchanged in Replay Cue mode", programIs(1)); });
+
+		add("R09 built-in provider", [this]() {
+			int before = fakerc::calls("CueEvent");
+			ctl()->setPlaybackProvider(false);
+			ctl()->selectSlot(kSlotReplay);
+			check("R09", "With the built-in provider, 9 never calls Replay Cue",
+			      fakerc::calls("CueEvent") == before && ctl()->lastMessage().contains("not READY"),
+			      ctl()->lastMessage());
+			ctl()->setPlaybackProvider(true);
+		});
+		sleep(1500); // let the multiview draw Replay Cue tiles for the screenshot
+	}
+
 	void buildPhase2()
 	{
 		add("P2 persistence", [this]() {

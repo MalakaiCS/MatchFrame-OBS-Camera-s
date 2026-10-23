@@ -52,6 +52,11 @@ surface, with Qt controls kept outside it:
 └ HIGHLIGHTS …                                                                                    ┘
 ```
 
+The layout adapts to the window. On 16:9 and wider screens it switches to a wide
+arrangement: cameras 1–4 + Replay, then cameras 5–8 + Highlights, under the monitors. That
+drops a row, so every pane is larger. Tall windows keep the stacked rows shown above. Use
+**Full Screen** for the largest panes.
+
 Every tile shows its composed OBS scene, graphics included. Tiles carry text **PREVIEW**
 and **LIVE** badges plus green and red borders, so tally never relies on colour alone. The
 red monitor is the Program **bus**. **STREAMING** and **RECORDING** are separate indicators
@@ -61,17 +66,17 @@ read from OBS's real output state.
 
 ### Linux (built and tested: x86_64, OBS 30.2.x)
 
-Per-user install from `dist/matchframe-multiview-1.0.0-linux-x86_64.tar.gz`:
+Per-user install from `dist/matchframe-multiview-1.1.0-linux-x86_64.tar.gz`:
 
 ```bash
 mkdir -p ~/.config/obs-studio/plugins
-tar -xzf matchframe-multiview-1.0.0-linux-x86_64.tar.gz -C ~/.config/obs-studio/plugins
+tar -xzf matchframe-multiview-1.1.0-linux-x86_64.tar.gz -C ~/.config/obs-studio/plugins
 # result: ~/.config/obs-studio/plugins/matchframe-multiview/bin/64bit/matchframe-multiview.so
 #         ~/.config/obs-studio/plugins/matchframe-multiview/data/locale/en-US.ini
 ```
 
-Or install system-wide with the Debian package (`dist/matchframe-multiview-1.0.0-x86_64-linux-gnu.deb`):
-`sudo apt install ./matchframe-multiview-1.0.0-x86_64-linux-gnu.deb`.
+Or install system-wide with the Debian package (`dist/matchframe-multiview-1.1.0-x86_64-linux-gnu.deb`):
+`sudo apt install ./matchframe-multiview-1.1.0-x86_64-linux-gnu.deb`.
 
 Restart OBS. **Tools → MatchFrame Multiview** should appear, and the OBS log should show
 `[matchframe-multiview] plugin loaded successfully`.
@@ -90,17 +95,17 @@ across major versions, so build from source for any other OBS version (see §8).
 Built by CI on GitHub's `windows-2022` runners (MSVC, against OBS 31.1.1 from
 `buildspec.json`). **Compiled, not runtime-tested.**
 
-* **Installer:** run `matchframe-multiview-1.0.0-windows-x64-Installer.exe`. Close OBS first.
+* **Installer:** run `matchframe-multiview-1.1.0-windows-x64-Installer.exe`. Close OBS first.
   It installs into `%ProgramData%\obs-studio\plugins\matchframe-multiview\`, which OBS 30+
   loads automatically, and registers an uninstaller under *Settings → Apps*.
-* **Manual:** extract `matchframe-multiview-1.0.0-windows-x64.zip` into
+* **Manual:** extract `matchframe-multiview-1.1.0-windows-x64.zip` into
   `%ProgramData%\obs-studio\plugins\`. To uninstall, delete that folder.
 
 ### macOS (universal: Apple silicon + Intel, OBS 30 or newer)
 
 Built by CI on GitHub's `macos-15` runners. **Compiled, not runtime-tested.**
 
-* **Installer:** open `matchframe-multiview-1.0.0-macos-universal.pkg`. It installs
+* **Installer:** open `matchframe-multiview-1.1.0-macos-universal.pkg`. It installs
   `matchframe-multiview.plugin` into `~/Library/Application Support/obs-studio/plugins/`.
   The package is **unsigned and not notarized**, because no Apple Developer ID is set up in CI.
   macOS will block it the first time: right-click (or Control-click) the `.pkg` and choose
@@ -210,6 +215,40 @@ disarms a slot; press **Arm** before taking it.
 Camera graphics (live clock/score) are **not** placed on playback scenes, because a live
 clock over a replay would mislead. Each playback scene can instead have its own optional
 overlay URL (e.g. "REPLAY" branding) in Setup, independent of the camera toggle.
+
+### Replay and Highlights from MatchFrame Replay Cue
+
+If you use [MatchFrame Replay Cue](https://github.com/MalakaiCS/MatchFrame-OBS-Replay-Cue) for
+multi-angle instant replays, the multiview can drive it in place of the built-in file
+playback. Choose **Setup… → Replay / Highlights source → MatchFrame Replay Cue**.
+
+* The **Replay** and **Highlights** tiles show Replay Cue's own scenes, with its live status:
+  the replay name, angle, speed, time, ARMED, the number of replays and the match phase.
+  The tiles appear after Replay Cue has created its *Replay* scene, which it does the first
+  time it plays.
+* **9** (or the Replay tile) asks Replay Cue to **cue** the replay selected in its list, or
+  the latest. Replay Cue loads it paused and puts its Replay scene in **Preview**.
+* **CUT** then asks Replay Cue to **play** it. Replay Cue takes it to air with *its own*
+  replay transition (stinger, fade, …), slow motion and angle switching. It also remembers
+  your live camera for its automatic return.
+* **0** (or the Highlights tile) stages the highlights reel for the current break, and
+  **CUT** plays it. **Play Highlights (LIVE)** in the panel puts it on air immediately.
+* **Return Live** asks Replay Cue to return to live with its return transition. If Replay Cue
+  can't (for example the replay was put on air outside Replay Cue and no live scene is set),
+  the multiview cuts to the last live camera itself after about 2.5 s.
+* The panel under the multiview drives Replay Cue directly:
+  - **Instant Replay**, **Mark IN / Mark OUT**;
+  - **◀ Prev / Cue / Next ▶** through its replay list;
+  - **Play / Pause**, which turns red and shows **(LIVE)** when on air;
+  - **25 / 50 / 75 / 100 %** slow motion and **◀ Angle / Angle ▶**.
+* Camera switching, graphics and everything else work exactly as before.
+
+How it connects: Replay Cue publishes an obs-websocket vendor named `ReplayCue`. Because
+both plugins run inside the same OBS, the multiview calls it **in-process** through
+obs-websocket's plugin API. There's no network connection, no password and no extra setup.
+It needs Replay Cue installed (OBS 32.2+) and obs-websocket, which ships with OBS. If Replay
+Cue isn't found, the tiles say so and camera switching is unaffected. If you've renamed
+Replay Cue's scenes, pick them in Setup; by default they're detected automatically.
 
 ## 5. Audio routing (configure in OBS)
 

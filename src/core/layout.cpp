@@ -32,39 +32,33 @@ static void placeRow(Layout &out, const int *panes, int count, double tileW, dou
 	}
 }
 
-Layout computeLayout(const LayoutInput &in)
+// Shrinks the rows uniformly when the stacked video heights do not fit.
+static double fitFactor(double available, double fixedH, double videoH)
+{
+	if (fixedH + videoH <= available)
+		return 1.0;
+	return std::max(0.0, (available - fixedH) / videoH);
+}
+
+// Stacked: [Preview | Program] / cameras 1-4 / cameras 5-8 / compact [Replay | Highlights].
+// Best for tall or narrow windows.
+static Layout stackedLayout(const LayoutInput &in, double a, double s, double L)
 {
 	Layout out;
 	out.width = in.width;
 	out.height = in.height;
-
-	const double a = in.canvasAspect > 0 ? in.canvasAspect : 16.0 / 9.0;
-	const double s = std::max(0.0, in.spacing);
-	const double L = std::max(0.0, in.labelHeight);
 	const double pbScale = std::clamp(in.playbackScale, 0.25, 1.0);
 
-	if (!(in.width > 0) || !(in.height > 0))
-		return out;
-
-	// Width-limited sizes: two monitors across, four cameras across.
 	double topW = (in.width - 3 * s) / 2.0;
 	double camW = (in.width - 5 * s) / 4.0;
 	double pbW = camW * pbScale;
-
-	// Height needed: 4 rows of labels, 5 gaps, video heights.
 	const double fixedH = 4 * L + 5 * s;
-	const double videoH = (topW + 2 * camW + pbW) / a;
-	if (fixedH + videoH > in.height) {
-		// Shrink every row by the same factor so all twelve panes remain visible.
-		// Preview/Program stay twice the camera width (priority to the large monitors).
-		double k = (in.height - fixedH) / videoH;
-		k = std::max(k, 0.0);
-		topW *= k;
-		camW *= k;
-		pbW *= k;
-	}
+	const double k = fitFactor(in.height, fixedH, (topW + 2 * camW + pbW) / a);
+	topW *= k;
+	camW *= k;
+	pbW *= k;
 	if (topW < 1 || camW < 1 || pbW < 1)
-		return out; // too small to draw anything meaningful
+		return out;
 
 	const double topH = topW / a, camH = camW / a, pbH = pbW / a;
 	const double usedH = topH + 2 * camH + pbH + fixedH;
@@ -73,20 +67,82 @@ Layout computeLayout(const LayoutInput &in)
 	const int top[] = {kPanePreview, kPaneProgram};
 	placeRow(out, top, 2, topW, topH, L, s, in.width, y);
 	y += topH + L + s;
-
 	const int row1[] = {kPaneCam1 + 0, kPaneCam1 + 1, kPaneCam1 + 2, kPaneCam1 + 3};
 	placeRow(out, row1, 4, camW, camH, L, s, in.width, y);
 	y += camH + L + s;
-
 	const int row2[] = {kPaneCam1 + 4, kPaneCam1 + 5, kPaneCam1 + 6, kPaneCam1 + 7};
 	placeRow(out, row2, 4, camW, camH, L, s, in.width, y);
 	y += camH + L + s;
-
 	const int pb[] = {kPaneReplay, kPaneHighlights};
 	placeRow(out, pb, 2, pbW, pbH, L, s, in.width, y);
 
 	out.valid = true;
 	return out;
+}
+
+// Wide: [Preview | Program] / cameras 1-4 + Replay / cameras 5-8 + Highlights.
+// One row fewer, so on 16:9 and wider screens every pane gets larger.
+static Layout wideLayout(const LayoutInput &in, double a, double s, double L)
+{
+	Layout out;
+	out.width = in.width;
+	out.height = in.height;
+
+	double topW = (in.width - 3 * s) / 2.0;
+	double tileW = (in.width - 6 * s) / 5.0;
+	const double fixedH = 3 * L + 4 * s;
+	const double k = fitFactor(in.height, fixedH, (topW + 2 * tileW) / a);
+	topW *= k;
+	tileW *= k;
+	if (topW < 1 || tileW < 1)
+		return out;
+
+	const double topH = topW / a, tileH = tileW / a;
+	const double usedH = topH + 2 * tileH + fixedH;
+	double y = s + std::max(0.0, (in.height - usedH) / 2.0);
+
+	const int top[] = {kPanePreview, kPaneProgram};
+	placeRow(out, top, 2, topW, topH, L, s, in.width, y);
+	y += topH + L + s;
+	const int row1[] = {kPaneCam1 + 0, kPaneCam1 + 1, kPaneCam1 + 2, kPaneCam1 + 3, kPaneReplay};
+	placeRow(out, row1, 5, tileW, tileH, L, s, in.width, y);
+	y += tileH + L + s;
+	const int row2[] = {kPaneCam1 + 4, kPaneCam1 + 5, kPaneCam1 + 6, kPaneCam1 + 7, kPaneHighlights};
+	placeRow(out, row2, 5, tileW, tileH, L, s, in.width, y);
+
+	out.valid = true;
+	return out;
+}
+
+Layout computeLayout(const LayoutInput &in)
+{
+	Layout invalid;
+	invalid.width = in.width;
+	invalid.height = in.height;
+	if (!(in.width > 0) || !(in.height > 0))
+		return invalid;
+
+	const double a = in.canvasAspect > 0 ? in.canvasAspect : 16.0 / 9.0;
+	const double s = std::max(0.0, in.spacing);
+	const double L = std::max(0.0, in.labelHeight);
+
+	if (in.mode == LayoutMode::Stacked)
+		return stackedLayout(in, a, s, L);
+	if (in.mode == LayoutMode::Wide)
+		return wideLayout(in, a, s, L);
+
+	// Auto: whichever arrangement gives the larger Preview/Program monitors for this
+	// window; on a tie (both width-limited) prefer the larger camera tiles.
+	Layout st = stackedLayout(in, a, s, L);
+	Layout wd = wideLayout(in, a, s, L);
+	if (!st.valid)
+		return wd;
+	if (!wd.valid)
+		return st;
+	const double stTop = st.panes[kPanePreview].video.w, wdTop = wd.panes[kPanePreview].video.w;
+	if (std::fabs(stTop - wdTop) > 1.0)
+		return wdTop > stTop ? wd : st;
+	return wd.panes[kPaneCam1].video.w > st.panes[kPaneCam1].video.w ? wd : st;
 }
 
 int hitTest(const Layout &layout, double x, double y)

@@ -1,5 +1,32 @@
 # Changelog
 
+## v1.1.0 — 2026-10-23
+
+### Added
+- **MatchFrame Replay Cue integration.** New *Replay / Highlights source* option in Setup.
+  With it on, the multiview drives the Replay Cue plugin through its `ReplayCue`
+  obs-websocket vendor requests, called in-process:
+  - the tiles show Replay Cue's Replay and Highlights scenes and live status;
+  - **9** cues the selected replay into Preview, and **CUT** plays it with Replay Cue's own
+    transition;
+  - **0** stages the highlights reel, and **CUT** plays it;
+  - **Return Live** uses Replay Cue's return, falling back to the last live camera;
+  - new panel controls: Instant Replay, Mark IN/OUT, previous/cue/next, Play/Pause,
+    25–100 % slow motion, angle ◀ ▶, Play Highlights.
+
+  The built-in prepared-file playback is unchanged and remains the default.
+
+### Changed
+- **Multiview fills the screen.** The layout now chooses between two arrangements for the
+  window's actual size:
+  - **Wide:** monitors on top; cameras 1–4 + Replay; cameras 5–8 + Highlights.
+  - **Stacked:** the original four rows, with a compact playback row at the bottom.
+
+  On 16:9 and wider screens the wide arrangement drops a row, so Preview/Program and every
+  tile get larger: on a 1080p monitor the monitors grow by about a third. Tall or narrow
+  windows keep the stacked arrangement. The layout is recalculated on every resize,
+  full-screen toggle and screen/DPI change.
+
 ## v1.0.0 — 2026-10-23
 
 First release of MatchFrame Multiview, a native OBS Studio plugin for live sports switching.

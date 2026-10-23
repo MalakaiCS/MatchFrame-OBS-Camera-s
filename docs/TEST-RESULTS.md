@@ -103,6 +103,36 @@ Also verified: no "Not all sources were cleared" in any OBS log, on collection s
 at exit. An earlier iteration of the test found exactly that problem, a render-thread
 reference race, and it was fixed.
 
+## 2b. Replay Cue integration (phase 3, in real OBS)
+
+MatchFrame Replay Cue needs OBS 32.2+, and the test OBS here is 30.2.3, so **the real Replay
+Cue plugin was not run**. Instead, phase 3 registers a stand-in `ReplayCue` obs-websocket
+vendor (self-test builds only, `src/selftest-fake-replaycue.cpp`). It implements the requests
+the multiview uses, with Replay Cue's documented behaviour, and the real plugin code drives it
+through obs-websocket inside OBS. Result: **10/10 PASS**, stable over 3 consecutive runs.
+[`results/final-phase3-replaycue.json`](results/final-phase3-replaycue.json)
+
+| ID | Check | Result |
+|---|---|---|
+| R01 | Replay Cue detected in-process (GetStatus / GetEvents); its scene isn't created before the first play | PASS |
+| R02 | Key 9 → `CueEvent`; Replay Cue's Replay scene in Preview; Program unchanged | PASS |
+| R03 | CUT → `Resume`; Replay scene on Program; last live camera kept | PASS |
+| R04 | Return Live → `ReturnToLive`; Program back on the camera | PASS |
+| R05 | Replay Cue doesn't return → the multiview cuts to the last live camera itself | PASS |
+| R06 | Key 0 stages highlights; CUT → `PlayHighlights` exactly once (double press ignored) | PASS |
+| R07 / R07b | Panel controls (Instant Replay, 50 %, previous replay, marks, angle); a failing request is reported | PASS |
+| R08 | Camera Preview / CUT unchanged in Replay Cue mode | PASS |
+| R09 | Built-in provider never calls Replay Cue | PASS |
+
+The test found two real bugs, both fixed:
+- A double-press guard refused a legitimate re-take right after Return Live.
+- A race: CUT within milliseconds of 9 was refused because Replay Cue's status snapshot
+  hadn't updated yet.
+
+**Still to verify with the real plugin (OBS 32.2+):** Replay Cue's own transitions, slow
+motion and angle switching on air, highlights reels across a real break, and the
+auto-detection of its scenes, including its player source.
+
 ## 3. Packaging (manual, scripted here)
 
 | Check | Result |

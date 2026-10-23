@@ -53,7 +53,12 @@ struct BankConfig {
 	std::string graphicsUuid; // the one shared camera-graphics Browser Source
 	bool graphicsVisible = true;
 	std::string lastLiveCameraUuid;
-	bool migratedFromV1 = false; // set by load when an old schema was upgraded
+	// Replay / Highlights provider: "builtin" (prepared files in MF — REPLAY / MF — HIGHLIGHTS)
+	// or "replaycue" (drive the MatchFrame Replay Cue plugin and show its scenes).
+	std::string playbackProvider = "builtin";
+	std::string replayCueReplayScene;     // empty = auto-detect
+	std::string replayCueHighlightsScene; // empty = auto-detect
+	bool migratedFromV1 = false;          // set by load when an old schema was upgraded
 
 	PlaybackSlotConfig &playback(int slot) { return slot == 8 ? replay : highlights; }
 	const PlaybackSlotConfig &playback(int slot) const { return slot == 8 ? replay : highlights; }

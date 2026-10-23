@@ -36,6 +36,12 @@ struct PaneGeometry {
 	Rect label; // label strip below the video area
 };
 
+enum class LayoutMode {
+	Auto,    // pick the arrangement that gives the largest monitors for the window size
+	Stacked, // monitors / cameras 1-4 / cameras 5-8 / compact Replay + Highlights row
+	Wide,    // monitors / cameras 1-4 + Replay / cameras 5-8 + Highlights
+};
+
 struct LayoutInput {
 	double width = 0; // surface size, in the unit the caller wants back (physical px for rendering)
 	double height = 0;
@@ -43,6 +49,7 @@ struct LayoutInput {
 	double spacing = 8;          // gap between panes and around the edge
 	double labelHeight = 22;     // label strip height under each pane
 	double playbackScale = 0.75; // playback row tiles relative to camera tiles ("compact row")
+	LayoutMode mode = LayoutMode::Auto;
 };
 
 struct Layout {
@@ -51,9 +58,10 @@ struct Layout {
 	bool valid = false;
 };
 
-// Computes the 12-pane multiview layout: [Preview | Program] on top, two four-camera
-// rows, then a compact Replay / Highlights row. Sizes are derived from the available
-// space; all twelve panes are always laid out (they shrink rather than disappear).
+// Computes the 12-pane multiview layout with [Preview | Program] on top and the ten
+// scene tiles below, either stacked (two camera rows + a compact playback row) or wide
+// (Replay / Highlights at the end of the camera rows). Auto picks whichever fits the
+// window best. All twelve panes are always laid out (they shrink rather than disappear).
 Layout computeLayout(const LayoutInput &in);
 
 // Returns the pane index under (x, y) or -1. Coordinates use the same unit as the layout.
