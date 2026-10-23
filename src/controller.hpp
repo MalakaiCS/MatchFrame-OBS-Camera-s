@@ -57,6 +57,7 @@ public:
 	bool assignInput(int cam, const std::string &uuid, QString *message);
 	bool applyFraming(int cam, Framing framing, QString *message);
 	bool applyGraphicsUrl(const QString &url, QString *message);
+	void setGraphicsProgramOnly(bool programOnly);
 	bool setPlaybackOverlay(int slot, bool enabled, const QString &url, QString *message);
 
 	// --- MatchFrame Replay Cue provider ---
@@ -100,6 +101,7 @@ private slots:
 private:
 	void suspend();
 	void resume();
+	void applyCleanFeed();
 	void saveHotkeys();
 	void loadHotkeys();
 

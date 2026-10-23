@@ -23,8 +23,13 @@ FPS at the top of your results.
 - [ ] **Browser continuity:** note `page_loads` at `http://127.0.0.1:8765/stats`; perform **≥ 100 cuts across all eight
       camera scenes** (Space / 1–8); `page_loads` unchanged; the overlay clock never resets and the ticker never jumps.
 - [ ] Apply URL once: `page_loads` increases by exactly one (explicit reload is allowed).
-- [ ] (auto) Graphics ON/OFF hides/shows the overlay on Program, Preview and all camera tiles together; the page keeps
+- [ ] (auto) Graphics ON/OFF hides/shows the overlay on Program and in all eight camera scenes together; the page keeps
       running while hidden (fixture `/stats` → `last_beat` keeps updating, no new load).
+- [ ] (auto) With *Show camera graphics on Program only* ticked (default), the multiview's camera tiles and Preview pane
+      show the cameras clean while the Program pane, stream and recording show the overlay. Unticked, the tiles show it.
+- [ ] With a real Browser Source: set the overlay to a full-screen break graphic → every camera tile still shows its
+      camera; cut between cameras during the break → the break graphic stays on Program; `page_loads` unchanged.
+- [ ] Take Replay / Highlights → the camera overlay leaves Program; Return Live → it is back on the camera.
 - [ ] (auto) Hide one camera's overlay item by hand in OBS → button shows MIXED → press it → all ON.
 - [ ] (auto) Crop/scale one camera in OBS, run Repair → framing preserved, graphics still on top.
 

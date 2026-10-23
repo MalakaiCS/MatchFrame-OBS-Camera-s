@@ -1,419 +1,433 @@
 {
- "browser_source_available": false,
- "fail": 0,
- "graphics_source_type": "color_source_v3",
- "libobs_api_built": "30.2.3",
- "obs_version": "30.2.3.1-3~bpo24.04.1",
- "pass": 42,
- "perf": {
-  "closed": {
-   "average_frame_render_ms": 75.263972,
-   "cpu_percent_avg": 82.34754085202923,
-   "encode_frames": 901,
-   "encode_skipped_frames": 0,
-   "render_frames": 900,
-   "render_lagged_frames": 508,
-   "seconds": 30.006
-  },
-  "open": {
-   "average_frame_render_ms": 106.036411,
-   "cpu_percent_avg": 74.78619523717076,
-   "encode_frames": 902,
-   "encode_skipped_frames": 0,
-   "render_frames": 900,
-   "render_lagged_frames": 632,
-   "seconds": 30.01
-  }
- },
- "phase": 1,
- "qt_runtime": "6.4.2",
- "recording": "<workdir>/rec/2026-10-23 13-33-28.mkv",
- "results": [
-  {
-   "detail": "owned=10: MF \u2014 CAM 01; MF \u2014 CAM 02; MF \u2014 CAM 03; MF \u2014 CAM 04; MF \u2014 CAM 05 (2); MF \u2014 CAM 06; MF \u2014 CAM 07; MF \u2014 CAM 08; MF \u2014 REPLAY; MF \u2014 HIGHLIGHTS; ",
-   "id": "C01",
-   "pass": true,
-   "t_ms": 52,
-   "title": "Exactly ten plugin-owned scenes (8 cameras + Replay + Highlights)"
-  },
-  {
-   "detail": "MF \u2014 CAM 05 (2)",
-   "id": "C01b",
-   "pass": true,
-   "t_ms": 52,
-   "title": "Name collision with an unrelated object uses a safe alternative name and is reported"
-  },
-  {
-   "detail": "CAM1: TEST CAM 1 < MF \u2014 MatchFrame Overlay < | CAM2: TEST CAM 2 < MF \u2014 MatchFrame Overlay < | CAM3: TEST CAM 3 < MF \u2014 MatchFrame Overlay < | CAM4: TEST CAM 4 < MF \u2014 MatchFrame Overlay < | CAM5: TEST CAM 5 < MF \u2014 MatchFrame Overlay < | CAM6: TEST CAM 6 < MF \u2014 MatchFrame Overlay < | CAM7: TEST CAM 7 < MF \u2014 MatchFrame Overlay < | CAM8: MF \u2014 MatchFrame Overlay < | ",
-   "id": "C03",
-   "pass": true,
-   "t_ms": 52,
-   "title": "Each camera scene: its own input at the bottom, the shared graphics item directly above"
-  },
-  {
-   "detail": "graphics source 'MF \u2014 MatchFrame Overlay' (color_source_v3)",
-   "id": "C02",
-   "pass": true,
-   "t_ms": 52,
-   "title": "One graphics source instance shared by all eight camera scenes; no graphics helper scene"
-  },
-  {
-   "detail": "",
-   "id": "C04",
-   "pass": true,
-   "t_ms": 52,
-   "title": "Replay/Highlights scenes each hold their own media source (no camera graphics); restart-on-activate/loop/close-when-inactive OFF, monitoring OFF"
-  },
-  {
-   "detail": "1920x1080",
-   "id": "C05",
-   "pass": true,
-   "t_ms": 52,
-   "title": "Graphics source: shutdown-when-hidden OFF, refresh-on-active OFF, sized to canvas"
-  },
-  {
-   "detail": "sources 25->25, created on reruns 0/0/0, transform kept=1",
-   "id": "C06",
-   "pass": true,
-   "t_ms": 52,
-   "title": "Re-running Create / Repair creates no duplicates and preserves manual transforms"
-  },
-  {
-   "detail": "graphics index above camera=1",
-   "id": "C07",
-   "pass": true,
-   "t_ms": 52,
-   "title": "Graphics stay above the camera after per-camera edits (repair restores order, keeps framing)"
-  },
-  {
-   "detail": "program stayed '64c3aea7-2481-43de-a151-767f8a61b635'",
-   "id": "C08",
-   "pass": true,
-   "t_ms": 290,
-   "title": "Selecting any valid tile changes Preview only; Program unchanged"
-  },
-  {
-   "detail": "Camera 8: This camera slot is unassigned",
-   "id": "C09",
-   "pass": true,
-   "t_ms": 290,
-   "title": "Unassigned camera slot cannot be selected (partial bank)"
-  },
-  {
-   "detail": "",
-   "id": "C11b",
-   "pass": true,
-   "t_ms": 297,
-   "title": "Create / Repair clears transition overrides on the ten owned scenes"
-  },
-  {
-   "detail": "",
-   "id": "C09b",
-   "pass": true,
-   "t_ms": 317,
-   "title": "Assigning the eighth camera completes the bank (1-8 cameras supported)"
-  },
-  {
-   "detail": "Structural setup is disabled while streaming or recording (switching, playback loading and graphics visibility still work)",
-   "id": "C39",
-   "pass": true,
-   "t_ms": 371,
-   "title": "Create / Repair and input assignment are refused while recording; nothing changes"
-  },
-  {
-   "detail": "program after 331 ms; transition 'Cut'",
-   "id": "C10",
-   "pass": true,
-   "t_ms": 2310,
-   "title": "CUT moves Preview to Program with the Cut transition (no fade)"
-  },
-  {
-   "detail": "Scene has a per-scene transition override that is not Cut - remove it (or run Repair) ('MF \u2014 CAM 03' overrides with 'Fade')",
-   "id": "C11",
-   "pass": true,
-   "t_ms": 2425,
-   "title": "A per-scene non-Cut override blocks CUT with a clear message (no silent fade)"
-  },
-  {
-   "detail": "accepted=1 program changes=1",
-   "id": "C12",
-   "pass": true,
-   "t_ms": 4606,
-   "title": "20 rapid CUT requests produce exactly one take (no backlog of stale takes)"
-  },
-  {
-   "detail": "",
-   "id": "C13",
-   "pass": true,
-   "t_ms": 4728,
-   "title": "Number keys select Preview; held-key auto-repeat is ignored"
-  },
-  {
-   "detail": "focus on URL field=1, key reached field=1, preview unchanged=1",
-   "id": "C14",
-   "pass": true,
-   "t_ms": 4728,
-   "title": "Typing in a URL field never selects/takes a camera"
-  },
-  {
-   "detail": "off=1 programOff=1 on=1 sourceUnchanged=1 duplicateSceneMode=1",
-   "id": "C15",
-   "pass": true,
-   "t_ms": 4737,
-   "title": "One toggle hides/shows the owned graphics item in all eight camera scenes (and the Program instance); the source itself is untouched"
-  },
-  {
-   "detail": "",
-   "id": "C16",
-   "pass": true,
-   "t_ms": 4739,
-   "title": "Manual per-scene edits show MIXED until a global setting is applied"
-  },
-  {
-   "detail": "replay t=33ms state=4 highlights t=33ms",
-   "id": "C17",
-   "pass": true,
-   "t_ms": 5327,
-   "title": "Loaded files arm paused at the first frame (READY), not active in the output"
-  },
-  {
-   "detail": "max media time 33 ms, active=0",
-   "id": "C18",
-   "pass": true,
-   "t_ms": 65396,
-   "title": "Clip left in its tile and Preview for 60 s does not advance and is not active (no audio to Program)"
-  },
-  {
-   "detail": "media time 0 ms observed 62 ms after the take, starts=1",
-   "id": "C19",
-   "pass": true,
-   "t_ms": 65458,
-   "title": "CUT takes the armed replay to Program and starts it from the beginning"
-  },
-  {
-   "detail": "t=3200ms",
-   "id": "C20",
-   "pass": true,
-   "t_ms": 68619,
-   "title": "Preview change, resize and full screen do not restart an already playing clip"
-  },
-  {
-   "detail": "Replay: This playback scene is on Program - take another scene first",
-   "id": "C21",
-   "pass": true,
-   "t_ms": 68625,
-   "title": "File replace / arm is blocked while the playback source is on Program"
-  },
-  {
-   "detail": "",
-   "id": "C22",
-   "pass": true,
-   "t_ms": 68639,
-   "title": "An off-air Highlights reel can be replaced while Replay is live"
-  },
-  {
-   "detail": "replay t=33",
-   "id": "C23",
-   "pass": true,
-   "t_ms": 69683,
-   "title": "Replay leaving Program is paused and re-armed at its first frame; Highlights plays"
-  },
-  {
-   "detail": "last camera slot 3 expected 3, preview slot 8",
-   "id": "C24",
-   "pass": true,
-   "t_ms": 69684,
-   "title": "Last live camera is preserved across Replay \u2194 Highlights (never the Preview identity)"
-  },
-  {
-   "detail": "",
-   "id": "C25",
-   "pass": true,
-   "t_ms": 73245,
-   "title": "Return Live cuts to the last live camera; the playback slot re-arms"
-  },
-  {
-   "detail": "starts=1 t=2866",
-   "id": "C26",
-   "pass": true,
-   "t_ms": 76117,
-   "title": "A native OBS take into Replay starts it once on actual Program entry"
-  },
-  {
-   "detail": "t=33/8000",
-   "id": "C27",
-   "pass": true,
-   "t_ms": 82841,
-   "title": "At clip end: ENDED shown, last frame held, no loop and no automatic scene change"
-  },
-  {
-   "detail": "",
-   "id": "C28",
-   "pass": true,
-   "t_ms": 83561,
-   "title": "Native OBS scene changes update Program, tally and last-camera truthfully"
-  },
-  {
-   "detail": "A transition is still running in OBS - wait for it to finish",
-   "id": "C29",
-   "pass": true,
-   "t_ms": 84296,
-   "title": "A plugin take is suspended while an external transition is running"
-  },
-  {
-   "detail": "",
-   "id": "C30",
-   "pass": true,
-   "t_ms": 86289,
-   "title": "After an external fade, plugin CUT re-selects Cut and takes normally"
-  },
-  {
-   "detail": "Half-Time / Full-Time Highlights: Playback is not READY - load and arm a file first",
-   "id": "C31",
-   "pass": true,
-   "t_ms": 86719,
-   "title": "Missing media errors only that playback slot; camera switching still works"
-  },
-  {
-   "detail": "The assigned camera input no longer exists",
-   "id": "C32",
-   "pass": true,
-   "t_ms": 88108,
-   "title": "Deleted camera input: slot stays visible as MISSING, cannot be selected; Return Live to it is disabled (no random replacement); no automatic take"
-  },
-  {
-   "detail": "No valid last live camera to return to",
-   "id": "C33",
-   "pass": true,
-   "t_ms": 89350,
-   "title": "Deleting the last-live camera scene disables Return Live (no random replacement, no automatic take)"
-  },
-  {
-   "detail": "",
-   "id": "C35",
-   "pass": true,
-   "t_ms": 89968,
-   "title": "Renaming a bank scene keeps its assignment and identity"
-  },
-  {
-   "detail": "frames drawn while open: 13; scenes still showing after close: 0",
-   "id": "C36",
-   "pass": true,
-   "t_ms": 97906,
-   "title": "Repeated open/close and resize: display renders, references released on close"
-  },
-  {
-   "detail": "",
-   "id": "C37",
-   "pass": true,
-   "t_ms": 97906,
-   "title": "Closing the multiview leaves Program and recording running"
-  },
-  {
-   "detail": "No valid last live camera to return to",
-   "id": "C33b",
-   "pass": true,
-   "t_ms": 160601,
-   "title": "Repair recreates the deleted scene with a new identity; Return Live still refuses the old identity"
-  },
-  {
-   "detail": "",
-   "id": "C34",
-   "pass": true,
-   "t_ms": 160601,
-   "title": "Create / Repair never switches Program"
-  }
- ],
- "timeline": [
-  {
-   "detail": "",
-   "event": "repair1",
-   "rec_ms": -1,
-   "t_ms": 52
-  },
-  {
-   "detail": "",
-   "event": "recording_started",
-   "rec_ms": 0,
-   "t_ms": 366
-  },
-  {
-   "detail": "CAM 2",
-   "event": "cut",
-   "rec_ms": 1709,
-   "t_ms": 2075
-  },
-  {
-   "detail": "",
-   "event": "playback_loaded",
-   "rec_ms": 4545,
-   "t_ms": 4911
-  },
-  {
-   "detail": "",
-   "event": "offair_wait_start",
-   "rec_ms": 5022,
-   "t_ms": 5388
-  },
-  {
-   "detail": "",
-   "event": "offair_wait_end",
-   "rec_ms": 65030,
-   "t_ms": 65396
-  },
-  {
-   "detail": "",
-   "event": "replay_on_program",
-   "rec_ms": 65092,
-   "t_ms": 65458
-  },
-  {
-   "detail": "",
-   "event": "highlights_on_program",
-   "rec_ms": 68938,
-   "t_ms": 69304
-  },
-  {
-   "detail": "",
-   "event": "return_live",
-   "rec_ms": 72526,
-   "t_ms": 72892
-  },
-  {
-   "detail": "",
-   "event": "native_replay_on_program",
-   "rec_ms": 72880,
-   "t_ms": 73246
-  },
-  {
-   "detail": "",
-   "event": "replay_ended",
-   "rec_ms": 82475,
-   "t_ms": 82841
-  },
-  {
-   "detail": "",
-   "event": "native_camera",
-   "rec_ms": 82475,
-   "t_ms": 82841
-  },
-  {
-   "detail": "",
-   "event": "perf_open",
-   "rec_ms": 127954,
-   "t_ms": 128320
-  },
-  {
-   "detail": "",
-   "event": "perf_closed",
-   "rec_ms": 157999,
-   "t_ms": 158365
-  },
-  {
-   "detail": "",
-   "event": "recording_stopped",
-   "rec_ms": 161046,
-   "t_ms": 161412
-  }
- ]
+    "browser_source_available": false,
+    "fail": 0,
+    "graphics_source_type": "color_source_v3",
+    "libobs_api_built": "30.2.3",
+    "obs_version": "30.2.3.1-3~bpo24.04.1",
+    "pass": 44,
+    "perf": {
+        "closed": {
+            "average_frame_render_ms": 46.208071,
+            "cpu_percent_avg": 74.22873775098812,
+            "encode_frames": 301,
+            "encode_skipped_frames": 0,
+            "render_frames": 300,
+            "render_lagged_frames": 79,
+            "seconds": 10.018
+        },
+        "open": {
+            "average_frame_render_ms": 69.308927,
+            "cpu_percent_avg": 67.0752281110464,
+            "encode_frames": 300,
+            "encode_skipped_frames": 0,
+            "render_frames": 300,
+            "render_lagged_frames": 166,
+            "seconds": 10.005
+        }
+    },
+    "phase": 1,
+    "qt_runtime": "6.4.2",
+    "recording": "/tmp/claude-0/-home-user-MatchFrame-OBS-Camera-s/d90ea7cd-e274-5a15-b8bd-e5e0c14cfb70/scratchpad/rt5/rec/2026-10-23 23-36-57.mkv",
+    "results": [
+        {
+            "detail": "owned=10: MF — CAM 01; MF — CAM 02; MF — CAM 03; MF — CAM 04; MF — CAM 05 (2); MF — CAM 06; MF — CAM 07; MF — CAM 08; MF — REPLAY; MF — HIGHLIGHTS; ",
+            "id": "C01",
+            "pass": true,
+            "t_ms": 78,
+            "title": "Exactly ten plugin-owned scenes (8 cameras + Replay + Highlights)"
+        },
+        {
+            "detail": "MF — CAM 05 (2)",
+            "id": "C01b",
+            "pass": true,
+            "t_ms": 78,
+            "title": "Name collision with an unrelated object uses a safe alternative name and is reported"
+        },
+        {
+            "detail": "CAM1: TEST CAM 1 < MF — MatchFrame Overlay < | CAM2: TEST CAM 2 < MF — MatchFrame Overlay < | CAM3: TEST CAM 3 < MF — MatchFrame Overlay < | CAM4: TEST CAM 4 < MF — MatchFrame Overlay < | CAM5: TEST CAM 5 < MF — MatchFrame Overlay < | CAM6: TEST CAM 6 < MF — MatchFrame Overlay < | CAM7: TEST CAM 7 < MF — MatchFrame Overlay < | CAM8: MF — MatchFrame Overlay < | ",
+            "id": "C03",
+            "pass": true,
+            "t_ms": 78,
+            "title": "Each camera scene: its own input at the bottom, the shared graphics item directly above"
+        },
+        {
+            "detail": "graphics source 'MF — MatchFrame Overlay' (color_source_v3)",
+            "id": "C02",
+            "pass": true,
+            "t_ms": 78,
+            "title": "One graphics source instance shared by all eight camera scenes; no graphics helper scene"
+        },
+        {
+            "detail": "",
+            "id": "C04",
+            "pass": true,
+            "t_ms": 78,
+            "title": "Replay/Highlights scenes each hold their own media source (no camera graphics); restart-on-activate/loop/close-when-inactive OFF, monitoring OFF"
+        },
+        {
+            "detail": "1920x1080",
+            "id": "C05",
+            "pass": true,
+            "t_ms": 78,
+            "title": "Graphics source: shutdown-when-hidden OFF, refresh-on-active OFF, sized to canvas"
+        },
+        {
+            "detail": "sources 25->25, created on reruns 0/0/0, transform kept=1",
+            "id": "C06",
+            "pass": true,
+            "t_ms": 78,
+            "title": "Re-running Create / Repair creates no duplicates and preserves manual transforms"
+        },
+        {
+            "detail": "graphics index above camera=1",
+            "id": "C07",
+            "pass": true,
+            "t_ms": 78,
+            "title": "Graphics stay above the camera after per-camera edits (repair restores order, keeps framing)"
+        },
+        {
+            "detail": "program stayed 'd0164b74-c929-4562-ab5f-2bd3b4549ae8'",
+            "id": "C08",
+            "pass": true,
+            "t_ms": 621,
+            "title": "Selecting any valid tile changes Preview only; Program unchanged"
+        },
+        {
+            "detail": "Camera 8: This camera slot is unassigned",
+            "id": "C09",
+            "pass": true,
+            "t_ms": 621,
+            "title": "Unassigned camera slot cannot be selected (partial bank)"
+        },
+        {
+            "detail": "",
+            "id": "C11b",
+            "pass": true,
+            "t_ms": 622,
+            "title": "Create / Repair clears transition overrides on the ten owned scenes"
+        },
+        {
+            "detail": "",
+            "id": "C09b",
+            "pass": true,
+            "t_ms": 647,
+            "title": "Assigning the eighth camera completes the bank (1-8 cameras supported)"
+        },
+        {
+            "detail": "Structural setup is disabled while streaming or recording (switching, playback loading and graphics visibility still work)",
+            "id": "C39",
+            "pass": true,
+            "t_ms": 687,
+            "title": "Create / Repair and input assignment are refused while recording; nothing changes"
+        },
+        {
+            "detail": "program after 290 ms; transition 'Cut'",
+            "id": "C10",
+            "pass": true,
+            "t_ms": 2607,
+            "title": "CUT moves Preview to Program with the Cut transition (no fade)"
+        },
+        {
+            "detail": "Scene has a per-scene transition override that is not Cut - remove it (or run Repair) ('MF — CAM 03' overrides with 'Fade')",
+            "id": "C11",
+            "pass": true,
+            "t_ms": 2686,
+            "title": "A per-scene non-Cut override blocks CUT with a clear message (no silent fade)"
+        },
+        {
+            "detail": "accepted=1 program changes=1",
+            "id": "C12",
+            "pass": true,
+            "t_ms": 4648,
+            "title": "20 rapid CUT requests produce exactly one take (no backlog of stale takes)"
+        },
+        {
+            "detail": "",
+            "id": "C13",
+            "pass": true,
+            "t_ms": 4835,
+            "title": "Number keys select Preview; held-key auto-repeat is ignored"
+        },
+        {
+            "detail": "focus on URL field=1, key reached field=1, preview unchanged=1",
+            "id": "C14",
+            "pass": true,
+            "t_ms": 4835,
+            "title": "Typing in a URL field never selects/takes a camera"
+        },
+        {
+            "detail": "off=1 programOff=1 on=1 sourceUnchanged=1 duplicateSceneMode=1",
+            "id": "C15",
+            "pass": true,
+            "t_ms": 4846,
+            "title": "One toggle hides/shows the owned graphics item in all eight camera scenes (and the Program instance); the source itself is untouched"
+        },
+        {
+            "detail": "",
+            "id": "C16",
+            "pass": true,
+            "t_ms": 4846,
+            "title": "Manual per-scene edits show MIXED until a global setting is applied"
+        },
+        {
+            "detail": "CAM01 tile=rgba(149,36,23,255) normal=rgba(0,255,0,255); Program (slot 3)=rgba(0,255,0,255); filter on source=1",
+            "id": "C40",
+            "pass": true,
+            "t_ms": 5642,
+            "title": "Camera graphics appear on Program but not in the multiview's camera tiles / Preview pane"
+        },
+        {
+            "detail": "off=rgba(0,255,0,255) on=rgba(149,36,23,255)",
+            "id": "C40b",
+            "pass": true,
+            "t_ms": 5686,
+            "title": "With the option off, the multiview tiles show the camera graphics again"
+        },
+        {
+            "detail": "replay t=33ms state=4 highlights t=33ms",
+            "id": "C17",
+            "pass": true,
+            "t_ms": 6158,
+            "title": "Loaded files arm paused at the first frame (READY), not active in the output"
+        },
+        {
+            "detail": "max media time 33 ms, active=0",
+            "id": "C18",
+            "pass": true,
+            "t_ms": 66220,
+            "title": "Clip left in its tile and Preview for 60 s does not advance and is not active (no audio to Program)"
+        },
+        {
+            "detail": "media time 100 ms observed 90 ms after the take, starts=1",
+            "id": "C19",
+            "pass": true,
+            "t_ms": 66311,
+            "title": "CUT takes the armed replay to Program and starts it from the beginning"
+        },
+        {
+            "detail": "t=2766ms",
+            "id": "C20",
+            "pass": true,
+            "t_ms": 68971,
+            "title": "Preview change, resize and full screen do not restart an already playing clip"
+        },
+        {
+            "detail": "Replay: This playback scene is on Program - take another scene first",
+            "id": "C21",
+            "pass": true,
+            "t_ms": 68973,
+            "title": "File replace / arm is blocked while the playback source is on Program"
+        },
+        {
+            "detail": "",
+            "id": "C22",
+            "pass": true,
+            "t_ms": 68989,
+            "title": "An off-air Highlights reel can be replaced while Replay is live"
+        },
+        {
+            "detail": "replay t=33",
+            "id": "C23",
+            "pass": true,
+            "t_ms": 69880,
+            "title": "Replay leaving Program is paused and re-armed at its first frame; Highlights plays"
+        },
+        {
+            "detail": "last camera slot 3 expected 3, preview slot 8",
+            "id": "C24",
+            "pass": true,
+            "t_ms": 69880,
+            "title": "Last live camera is preserved across Replay ↔ Highlights (never the Preview identity)"
+        },
+        {
+            "detail": "",
+            "id": "C25",
+            "pass": true,
+            "t_ms": 73289,
+            "title": "Return Live cuts to the last live camera; the playback slot re-arms"
+        },
+        {
+            "detail": "starts=1 t=2533",
+            "id": "C26",
+            "pass": true,
+            "t_ms": 75898,
+            "title": "A native OBS take into Replay starts it once on actual Program entry"
+        },
+        {
+            "detail": "t=33/8000",
+            "id": "C27",
+            "pass": true,
+            "t_ms": 82937,
+            "title": "At clip end: ENDED shown, last frame held, no loop and no automatic scene change"
+        },
+        {
+            "detail": "",
+            "id": "C28",
+            "pass": true,
+            "t_ms": 83352,
+            "title": "Native OBS scene changes update Program, tally and last-camera truthfully"
+        },
+        {
+            "detail": "A transition is still running in OBS - wait for it to finish",
+            "id": "C29",
+            "pass": true,
+            "t_ms": 83723,
+            "title": "A plugin take is suspended while an external transition is running"
+        },
+        {
+            "detail": "",
+            "id": "C30",
+            "pass": true,
+            "t_ms": 85237,
+            "title": "After an external fade, plugin CUT re-selects Cut and takes normally"
+        },
+        {
+            "detail": "Half-Time / Full-Time Highlights: Playback is not READY - load and arm a file first",
+            "id": "C31",
+            "pass": true,
+            "t_ms": 85453,
+            "title": "Missing media errors only that playback slot; camera switching still works"
+        },
+        {
+            "detail": "The assigned camera input no longer exists",
+            "id": "C32",
+            "pass": true,
+            "t_ms": 86567,
+            "title": "Deleted camera input: slot stays visible as MISSING, cannot be selected; Return Live to it is disabled (no random replacement); no automatic take"
+        },
+        {
+            "detail": "No valid last live camera to return to",
+            "id": "C33",
+            "pass": true,
+            "t_ms": 87470,
+            "title": "Deleting the last-live camera scene disables Return Live (no random replacement, no automatic take)"
+        },
+        {
+            "detail": "",
+            "id": "C35",
+            "pass": true,
+            "t_ms": 87921,
+            "title": "Renaming a bank scene keeps its assignment and identity"
+        },
+        {
+            "detail": "frames drawn while open: 20; scenes still showing after close: 0",
+            "id": "C36",
+            "pass": true,
+            "t_ms": 94600,
+            "title": "Repeated open/close and resize: display renders, references released on close"
+        },
+        {
+            "detail": "",
+            "id": "C37",
+            "pass": true,
+            "t_ms": 94601,
+            "title": "Closing the multiview leaves Program and recording running"
+        },
+        {
+            "detail": "No valid last live camera to return to",
+            "id": "C33b",
+            "pass": true,
+            "t_ms": 116966,
+            "title": "Repair recreates the deleted scene with a new identity; Return Live still refuses the old identity"
+        },
+        {
+            "detail": "",
+            "id": "C34",
+            "pass": true,
+            "t_ms": 116966,
+            "title": "Create / Repair never switches Program"
+        }
+    ],
+    "timeline": [
+        {
+            "detail": "",
+            "event": "repair1",
+            "rec_ms": -1,
+            "t_ms": 77
+        },
+        {
+            "detail": "",
+            "event": "recording_started",
+            "rec_ms": 0,
+            "t_ms": 686
+        },
+        {
+            "detail": "CAM 2",
+            "event": "cut",
+            "rec_ms": 1726,
+            "t_ms": 2412
+        },
+        {
+            "detail": "",
+            "event": "playback_loaded",
+            "rec_ms": 5075,
+            "t_ms": 5761
+        },
+        {
+            "detail": "",
+            "event": "offair_wait_start",
+            "rec_ms": 5528,
+            "t_ms": 6214
+        },
+        {
+            "detail": "",
+            "event": "offair_wait_end",
+            "rec_ms": 65534,
+            "t_ms": 66220
+        },
+        {
+            "detail": "",
+            "event": "replay_on_program",
+            "rec_ms": 65625,
+            "t_ms": 66311
+        },
+        {
+            "detail": "",
+            "event": "highlights_on_program",
+            "rec_ms": 68880,
+            "t_ms": 69566
+        },
+        {
+            "detail": "",
+            "event": "return_live",
+            "rec_ms": 72281,
+            "t_ms": 72967
+        },
+        {
+            "detail": "",
+            "event": "native_replay_on_program",
+            "rec_ms": 72603,
+            "t_ms": 73289
+        },
+        {
+            "detail": "",
+            "event": "replay_ended",
+            "rec_ms": 82251,
+            "t_ms": 82937
+        },
+        {
+            "detail": "",
+            "event": "native_camera",
+            "rec_ms": 82251,
+            "t_ms": 82937
+        },
+        {
+            "detail": "",
+            "event": "perf_open",
+            "rec_ms": 104434,
+            "t_ms": 105120
+        },
+        {
+            "detail": "",
+            "event": "perf_closed",
+            "rec_ms": 114474,
+            "t_ms": 115160
+        },
+        {
+            "detail": "",
+            "event": "recording_stopped",
+            "rec_ms": 116647,
+            "t_ms": 117333
+        }
+    ]
 }

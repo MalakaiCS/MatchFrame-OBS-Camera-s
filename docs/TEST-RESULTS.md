@@ -10,7 +10,7 @@ Legend: **PASS** = verified · **UNRUN** = not executed here (with the reason) �
 
 ## 1. Automated unit tests (no OBS needed)
 
-`build_x86_64/matchframe-unit-tests`: **27 tests, 2113 checks, 0 failures.**
+`build_x86_64/matchframe-unit-tests`: **34 tests, 8998 checks, 0 failures.**
 
 They cover:
 * layout and hit testing at 1080p, 4K, the minimum size, portrait and 4:3/21:9 canvases,
@@ -30,8 +30,9 @@ feeds (`tests/media/cam1..8.mp4` as looping Media Sources) and the two test clip
 Commentary is a looping 440 Hz tone on a global audio channel. OBS records Program and
 `analyze-recording.py` checks the recording. Phase 2 restarts OBS.
 
-**Final run (final binary):** phase 1 **42/42 PASS**, phase 2 **8/8 PASS**, recording
-analysis **9/9 PASS** (158 s recording).
+**Final run (1.2.0 code):** phase 1 **44/44 PASS**, phase 2 **8/8 PASS**, phase 3 **10/10
+PASS**, recording analysis **9/9 PASS** (115 s recording; this run used a 10 s performance
+window, so the performance figures in section 4 are from the earlier 30 s run).
 
 **Long run (30-min soak, previous build):** phase 1 41/42 and phase 2 8/8. 449 takes ran
 across cameras, Replay, Highlights and Return Live, with 0 rejected. Commentary was
@@ -86,6 +87,8 @@ During the soak, a compile job ran concurrently for a few minutes.
 | C36 | 10× open/close + 4 resizes: display renders; 0 scenes left showing after close | PASS |
 | C37 | Closing the multiview leaves Program and recording running | PASS |
 | C39 | Repair and assignment refused while recording; structure unchanged | PASS |
+| C40 | Graphics on Program only: every camera scene rendered as a multiview tile shows the camera (centre pixel = camera), the same scene rendered normally shows the overlay, and OBS's Program output shows the overlay; filter present on the graphics source | PASS* |
+| C40b | With the option off, the tiles show the overlay again; back on, clean again | PASS* |
 | P01–P05 | After an OBS restart: 10 scenes, UUID assignments, renamed scene, labels / URL / files, last live camera, playback re-armed | PASS |
 | P06–P08 | Switching to a new collection gives an empty bank with no stale references; switching back restores the bank; playback re-armed | PASS |
 | A1 | Commentary tone continuous across every camera and playback take | PASS (100 % of windows; 2143 s in the soak) |
@@ -166,6 +169,7 @@ measurement with real inputs is PENDING (hardware).**
 |---|---|---|
 | Browser Source page continuity over ≥ 100 cuts (fixture load-ID count) | **UNRUN** | OBS build has no obs-browser. Use an official / PPA / Flatpak OBS + `tests/fixtures/graphics/` (checklist). |
 | Browser shutdown / refresh flags in a live CEF instance; Apply URL reload count | **UNRUN** | Same reason. |
+| Clean multiview tiles with a real Browser Source (full-screen break graphic) | **UNRUN** | Same reason; the filter path was verified with the stand-in source (C40). |
 | Graphics fixture page itself | PASS (headless Chromium: transparent, clock running, load ID reported to the server) | – |
 | Windows / macOS build and runtime | **UNRUN** | Only Linux built. |
 | Native Wayland display | **UNRUN** | Tested on X11 (Xvfb) only. |

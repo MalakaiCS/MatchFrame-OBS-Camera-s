@@ -684,6 +684,7 @@ TEST(config_roundtrip)
 	c.graphicsUrl = "https://graphics.example/out?token=secret";
 	c.graphicsUuid = "uuid-g";
 	c.graphicsVisible = false;
+	c.graphicsProgramOnly = false;
 	c.lastLiveCameraUuid = "uuid-s1";
 
 	obs_data_t *d = obs_data_create();
@@ -708,6 +709,7 @@ TEST(config_roundtrip)
 	CHECK(r.highlights.graphicsEnabled);
 	CHECK_EQ(r.graphicsUuid, std::string("uuid-g"));
 	CHECK(!r.graphicsVisible);
+	CHECK(!r.graphicsProgramOnly);
 	CHECK_EQ(r.lastLiveCameraUuid, std::string("uuid-s1"));
 	CHECK(!r.migratedFromV1);
 }
@@ -721,6 +723,7 @@ TEST(config_defaults_when_missing)
 	CHECK_EQ(r.replay.sceneName, std::string("MF — REPLAY"));
 	CHECK_EQ(r.highlights.sceneName, std::string("MF — HIGHLIGHTS"));
 	CHECK(r.graphicsVisible);
+	CHECK(r.graphicsProgramOnly); // existing banks default to clean multiview tiles
 	obs_data_t *empty = obs_data_create();
 	BankConfig e = loadConfig(empty, "fresh2");
 	obs_data_release(empty);

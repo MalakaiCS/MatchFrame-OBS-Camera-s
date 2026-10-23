@@ -57,7 +57,11 @@ arrangement: cameras 1–4 + Replay, then cameras 5–8 + Highlights, under the 
 drops a row, so every pane is larger. Tall windows keep the stacked rows shown above. Use
 **Full Screen** for the largest panes.
 
-Every tile shows its composed OBS scene, graphics included. Tiles carry text **PREVIEW**
+Every tile shows its composed OBS scene. By default the camera tiles and the Preview pane
+show the cameras **without** the camera graphics, so you can still see every camera while a
+full-screen break graphic is on air. The graphics appear on **Program** (and in your stream
+and recording) exactly as before. To see the graphics in the tiles too, untick *Show camera
+graphics on Program only* in Setup. Tiles carry text **PREVIEW**
 and **LIVE** badges plus green and red borders, so tally never relies on colour alone. The
 red monitor is the Program **bus**. **STREAMING** and **RECORDING** are separate indicators
 read from OBS's real output state.
@@ -66,17 +70,17 @@ read from OBS's real output state.
 
 ### Linux (built and tested: x86_64, OBS 30.2.x)
 
-Per-user install from `dist/matchframe-multiview-1.1.0-linux-x86_64.tar.gz`:
+Per-user install from `dist/matchframe-multiview-1.2.0-linux-x86_64.tar.gz`:
 
 ```bash
 mkdir -p ~/.config/obs-studio/plugins
-tar -xzf matchframe-multiview-1.1.0-linux-x86_64.tar.gz -C ~/.config/obs-studio/plugins
+tar -xzf matchframe-multiview-1.2.0-linux-x86_64.tar.gz -C ~/.config/obs-studio/plugins
 # result: ~/.config/obs-studio/plugins/matchframe-multiview/bin/64bit/matchframe-multiview.so
 #         ~/.config/obs-studio/plugins/matchframe-multiview/data/locale/en-US.ini
 ```
 
-Or install system-wide with the Debian package (`dist/matchframe-multiview-1.1.0-x86_64-linux-gnu.deb`):
-`sudo apt install ./matchframe-multiview-1.1.0-x86_64-linux-gnu.deb`.
+Or install system-wide with the Debian package (`dist/matchframe-multiview-1.2.0-x86_64-linux-gnu.deb`):
+`sudo apt install ./matchframe-multiview-1.2.0-x86_64-linux-gnu.deb`.
 
 Restart OBS. **Tools → MatchFrame Multiview** should appear, and the OBS log should show
 `[matchframe-multiview] plugin loaded successfully`.
@@ -95,17 +99,17 @@ across major versions, so build from source for any other OBS version (see §8).
 Built by CI on GitHub's `windows-2022` runners (MSVC, against OBS 31.1.1 from
 `buildspec.json`). **Compiled, not runtime-tested.**
 
-* **Installer:** run `matchframe-multiview-1.1.0-windows-x64-Installer.exe`. Close OBS first.
+* **Installer:** run `matchframe-multiview-1.2.0-windows-x64-Installer.exe`. Close OBS first.
   It installs into `%ProgramData%\obs-studio\plugins\matchframe-multiview\`, which OBS 30+
   loads automatically, and registers an uninstaller under *Settings → Apps*.
-* **Manual:** extract `matchframe-multiview-1.1.0-windows-x64.zip` into
+* **Manual:** extract `matchframe-multiview-1.2.0-windows-x64.zip` into
   `%ProgramData%\obs-studio\plugins\`. To uninstall, delete that folder.
 
 ### macOS (universal: Apple silicon + Intel, OBS 30 or newer)
 
 Built by CI on GitHub's `macos-15` runners. **Compiled, not runtime-tested.**
 
-* **Installer:** open `matchframe-multiview-1.1.0-macos-universal.pkg`. It installs
+* **Installer:** open `matchframe-multiview-1.2.0-macos-universal.pkg`. It installs
   `matchframe-multiview.plugin` into `~/Library/Application Support/obs-studio/plugins/`.
   The package is **unsigned and not notarized**, because no Apple Developer ID is set up in CI.
   macOS will block it the first time: right-click (or Control-click) the `.pkg` and choose
@@ -132,6 +136,11 @@ The workflow uses them automatically.
      the overlay page, not the public homepage. Press **Apply URL**. The field is masked
      because URLs can carry tokens. The plugin never logs a full URL: query strings and
      deep paths are redacted.
+   * *Show camera graphics on Program only* (on by default) keeps the multiview's camera
+     tiles and Preview pane clean. It works through a small filter, *MatchFrame: hide in
+     multiview*, on the graphics source. It hides the overlay only in the multiview's own
+     panes; OBS's own Preview, projectors, stream and recording are unaffected. If you
+     delete the filter, Repair adds it back.
    * Press **Create / Repair MatchFrame Scenes**.
 3. Make sure **Studio Mode** is on. The multiview offers **Enable Studio Mode** if it's off;
    plugin takes are disabled without it.
@@ -212,7 +221,8 @@ affect the output. Replay and Highlights use separate media sources and playhead
 load the next half-time reel into Highlights while Replay is live. Off-air Play/Pause
 disarms a slot; press **Arm** before taking it.
 
-Camera graphics (live clock/score) are **not** placed on playback scenes, because a live
+Camera graphics (live clock/score) are **not** placed on playback scenes, so they drop off
+Program when Replay or Highlights goes live and come back with the next camera. A live
 clock over a replay would mislead. Each playback scene can instead have its own optional
 overlay URL (e.g. "REPLAY" branding) in Setup, independent of the camera toggle.
 

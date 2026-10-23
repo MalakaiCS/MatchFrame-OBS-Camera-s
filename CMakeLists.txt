@@ -77,6 +77,8 @@ set_target_properties(
 target_sources(
   ${CMAKE_PROJECT_NAME}
   PRIVATE
+    src/clean-feed.cpp
+    src/clean-feed.hpp
     src/controller.cpp
     src/controller.hpp
     src/graphics-controller.cpp

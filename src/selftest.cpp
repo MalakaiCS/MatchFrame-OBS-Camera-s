@@ -12,6 +12,7 @@
 
 #include "selftest.hpp"
 
+#include "clean-feed.hpp"
 #include "controller.hpp"
 #include "multiview-window.hpp"
 #include "obs-util.hpp"
@@ -22,6 +23,7 @@
 #include <util/config-file.h>
 #include <util/platform.h>
 #include <media-io/video-io.h>
+#include <graphics/vec4.h>
 
 #include <QApplication>
 #include <QCoreApplication>
@@ -107,6 +109,54 @@ private:
 	template<typename... A> void log(const char *fmt, A... a)
 	{
 		obs_log(LOG_INFO, (std::string("[selftest] ") + fmt).c_str(), a...);
+	}
+
+	// Renders `src` (nullptr = OBS's Program output texture) at a small size and returns
+	// the centre pixel (RGBA). `clean` renders it the way a multiview tile does.
+	static bool centrePixel(obs_source_t *src, bool clean, uint8_t rgba[4])
+	{
+		uint32_t w, h;
+		canvasSize(w, h);
+		const uint32_t cx = 64, cy = 36;
+		bool ok = false;
+		obs_enter_graphics();
+		gs_texrender_t *tr = gs_texrender_create(GS_RGBA, GS_ZS_NONE);
+		gs_stagesurf_t *st = gs_stagesurface_create(cx, cy, GS_RGBA);
+		if (tr && st && gs_texrender_begin(tr, cx, cy)) {
+			vec4 zero;
+			vec4_zero(&zero);
+			gs_clear(GS_CLEAR_COLOR, &zero, 0.0f, 0);
+			gs_ortho(0.0f, (float)w, 0.0f, (float)h, -100.0f, 100.0f);
+			gs_blend_state_push();
+			gs_blend_function(GS_BLEND_ONE, GS_BLEND_INVSRCALPHA);
+			if (!src) {
+				obs_render_main_texture();
+			} else if (clean) {
+				CleanFeedScope scope;
+				obs_source_video_render(src);
+			} else {
+				obs_source_video_render(src);
+			}
+			gs_blend_state_pop();
+			gs_texrender_end(tr);
+			gs_stage_texture(st, gs_texrender_get_texture(tr));
+			uint8_t *data = nullptr;
+			uint32_t linesize = 0;
+			if (gs_stagesurface_map(st, &data, &linesize)) {
+				memcpy(rgba, data + (cy / 2) * linesize + (cx / 2) * 4, 4);
+				gs_stagesurface_unmap(st);
+				ok = true;
+			}
+		}
+		gs_stagesurface_destroy(st);
+		gs_texrender_destroy(tr);
+		obs_leave_graphics();
+		return ok;
+	}
+	static bool isMarkerGreen(const uint8_t p[4]) { return p[0] <= 6 && p[1] >= 249 && p[2] <= 6; }
+	static QString px(const uint8_t p[4])
+	{
+		return QString("rgba(%1,%2,%3,%4)").arg(p[0]).arg(p[1]).arg(p[2]).arg(p[3]);
 	}
 
 	void add(const QString &name, std::function<void()> run, std::function<bool()> until = nullptr,
@@ -789,6 +839,65 @@ private:
 			bool resolved = ctl()->graphics().visibility() == GraphicsVisibility::On;
 			check("C16", "Manual per-scene edits show MIXED until a global setting is applied",
 			      mixed && resolved);
+		});
+
+		// ---- Graphics on Program only: tiles and Preview render the cameras clean
+		add("graphics marker colour", [this]() {
+			OBSSourceAutoRelease g = ctl()->bank().cameraGraphics();
+			if (g && strcmp(graphicsSourceTypeId(), "browser_source") != 0) {
+				OBSDataAutoRelease s = obs_data_create();
+				obs_data_set_int(s, "color", 0xFF00FF00); // opaque pure green (ABGR)
+				obs_source_update(g, s);
+			}
+			ctl()->setGraphicsProgramOnly(true);
+			OBSSourceAutoRelease program = obs_frontend_get_current_scene();
+			if (ctl()->bank().slotOfScene(program) < 0 || ctl()->bank().slotOfScene(program) > 7) {
+				ctl()->selectSlot(0); // Program must show a camera scene for the check
+				ctl()->cut();
+			}
+		});
+		sleep(500);
+		add("C40 graphics on Program only", [this]() {
+			OBSSourceAutoRelease g = ctl()->bank().cameraGraphics();
+			OBSSourceAutoRelease program = obs_frontend_get_current_scene();
+			const int progSlot = ctl()->bank().slotOfScene(program);
+			bool filter = hasCleanFeedFilter(g);
+			bool tilesClean = true;
+			QString detail;
+			for (int i = 0; i < 8; i++) {
+				OBSSourceAutoRelease s = ctl()->bank().slotScene(i);
+				uint8_t tile[4] = {}, full[4] = {};
+				bool a = centrePixel(s, true, tile), b = centrePixel(s, false, full);
+				tilesClean = tilesClean && a && b && !isMarkerGreen(tile) && isMarkerGreen(full);
+				if (i == 0)
+					detail += QString("CAM01 tile=%1 normal=%2; ").arg(px(tile), px(full));
+			}
+			uint8_t prog[4] = {};
+			bool progOk = centrePixel(nullptr, false, prog) && isMarkerGreen(prog) && progSlot >= 0 &&
+				      progSlot < 8;
+			detail += QString("Program (slot %1)=%2; filter on source=%3")
+					  .arg(progSlot)
+					  .arg(px(prog))
+					  .arg(filter);
+			check("C40",
+			      "Camera graphics appear on Program but not in the multiview's camera tiles / Preview pane",
+			      filter && tilesClean && progOk, detail);
+
+			ctl()->setGraphicsProgramOnly(false);
+			OBSSourceAutoRelease s1 = ctl()->bank().slotScene(0);
+			uint8_t off[4] = {};
+			bool shownWhenOff = centrePixel(s1, true, off) && isMarkerGreen(off);
+			ctl()->setGraphicsProgramOnly(true);
+			uint8_t on[4] = {};
+			bool cleanAgain = centrePixel(s1, true, on) && !isMarkerGreen(on);
+			check("C40b", "With the option off, the multiview tiles show the camera graphics again",
+			      shownWhenOff && cleanAgain, QString("off=%1 on=%2").arg(px(off), px(on)));
+
+			if (g && strcmp(graphicsSourceTypeId(), "browser_source") != 0) {
+				OBSDataAutoRelease s = obs_data_create();
+				obs_data_set_int(s, "color", 0x30FFFFFF);
+				obs_source_update(g, s);
+			}
 		});
 
 		// ---- Replay / Highlights loading

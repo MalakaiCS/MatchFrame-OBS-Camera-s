@@ -55,6 +55,7 @@ private:
 	QPushButton *showUrl_ = nullptr;
 	QPushButton *applyUrl_ = nullptr;
 	QLabel *graphicsState_ = nullptr;
+	QCheckBox *programOnly_ = nullptr;
 	QLabel *canvas_ = nullptr;
 	QPushButton *repair_ = nullptr;
 	QLabel *repairNote_ = nullptr;
