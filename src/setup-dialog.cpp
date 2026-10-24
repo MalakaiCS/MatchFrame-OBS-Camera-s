@@ -6,12 +6,17 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFormLayout>
+#include <QFrame>
+#include <QGuiApplication>
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
+#include <QScreen>
 #include <QScrollArea>
 #include <QSignalBlocker>
 #include <QVBoxLayout>
+
+#include <algorithm>
 
 namespace mf {
 
@@ -20,6 +25,11 @@ SetupDialog::SetupDialog(Controller *controller, QWidget *parent) : QDialog(pare
 	setWindowTitle("MatchFrame Multiview – Setup");
 	setModal(false);
 	resize(1100, 820);
+	if (QScreen *screen = parent ? parent->screen() : QGuiApplication::primaryScreen()) {
+		// Never open taller or wider than the screen; the contents scroll instead.
+		const QRect avail = screen->availableGeometry();
+		resize(std::min(1100, avail.width() - 40), std::min(820, avail.height() - 80));
+	}
 	build();
 	connect(controller_, &Controller::stateChanged, this, [this]() {
 		if (isVisible())
@@ -33,7 +43,16 @@ SetupDialog::SetupDialog(Controller *controller, QWidget *parent) : QDialog(pare
 
 void SetupDialog::build()
 {
-	auto *root = new QVBoxLayout(this);
+	// Everything but the Close button scrolls, so every setting stays reachable on small or
+	// scaled screens.
+	auto *outer = new QVBoxLayout(this);
+	auto *scroll = new QScrollArea(this);
+	scroll->setWidgetResizable(true);
+	scroll->setFrameShape(QFrame::NoFrame);
+	auto *content = new QWidget(scroll);
+	auto *root = new QVBoxLayout(content);
+	scroll->setWidget(content);
+	outer->addWidget(scroll, 1);
 
 	// --- Cameras
 	auto *camBox = new QGroupBox(
@@ -259,7 +278,7 @@ void SetupDialog::build()
 	auto *cl = new QHBoxLayout;
 	cl->addStretch(1);
 	cl->addWidget(close);
-	root->addLayout(cl);
+	outer->addLayout(cl);
 }
 
 void SetupDialog::reload()

@@ -89,6 +89,7 @@ During the soak, a compile job ran concurrently for a few minutes.
 | C39 | Repair and assignment refused while recording; structure unchanged | PASS |
 | C40 | Graphics on Program only: every camera scene rendered as a multiview tile shows the camera (centre pixel = camera), the same scene rendered normally shows the overlay, and OBS's Program output shows the overlay; filter present on the graphics source | PASS* |
 | C40b | With the option off, the tiles show the overlay again; back on, clean again | PASS* |
+| C41 | Setup opens within the screen and, shrunk to 800×420, scrolls every button into view | PENDING-RUN |
 | P01–P05 | After an OBS restart: 10 scenes, UUID assignments, renamed scene, labels / URL / files, last live camera, playback re-armed | PASS |
 | P06–P08 | Switching to a new collection gives an empty bank with no stale references; switching back restores the bank; playback re-armed | PASS |
 | A1 | Commentary tone continuous across every camera and playback take | PASS (100 % of windows; 2143 s in the soak) |
