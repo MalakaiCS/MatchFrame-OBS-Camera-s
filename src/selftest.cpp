@@ -35,6 +35,11 @@
 #include <QKeyEvent>
 #include <QLineEdit>
 #include <QMainWindow>
+#include <QPushButton>
+#include <QScreen>
+#include <QScrollArea>
+#include <QScrollBar>
+#include <QDialog>
 #include <QTimer>
 
 #include <atomic>
@@ -153,6 +158,51 @@ private:
 		obs_leave_graphics();
 		return ok;
 	}
+	// Setup must fit the screen and scroll so that every setting can be reached, even when
+	// the window is much smaller than its contents (small or scaled screens).
+	void checkSetupScrolls()
+	{
+		QDialog *dlg = nullptr;
+		for (auto *w : QApplication::topLevelWidgets())
+			if (w->isVisible() && w->windowTitle().contains("Setup"))
+				dlg = qobject_cast<QDialog *>(w);
+		QScrollArea *scroll = dlg ? dlg->findChild<QScrollArea *>() : nullptr;
+		bool fits = false, reachable = scroll != nullptr;
+		QString detail;
+		if (dlg && scroll) {
+			const QRect avail = dlg->screen()->availableGeometry();
+			fits = dlg->width() <= avail.width() && dlg->height() <= avail.height();
+			detail = QString("opened %1x%2 on %3x%4; ")
+					 .arg(dlg->width())
+					 .arg(dlg->height())
+					 .arg(avail.width())
+					 .arg(avail.height());
+			const QSize opened = dlg->size();
+			dlg->resize(800, 420); // far smaller than the contents
+			QApplication::processEvents();
+			int total = 0;
+			for (auto *b : scroll->widget()->findChildren<QPushButton *>()) {
+				if (!b->isVisibleTo(scroll->widget()))
+					continue;
+				total++;
+				scroll->ensureWidgetVisible(b, 0, 0);
+				QApplication::processEvents();
+				const QRect r(b->mapTo(scroll->viewport(), QPoint(0, 0)), b->size());
+				if (!scroll->viewport()->rect().contains(r)) {
+					reachable = false;
+					detail += QString("unreachable '%1'; ").arg(b->text());
+				}
+			}
+			detail += QString("%1 buttons reachable at 800x420, scroll range %2")
+					  .arg(total)
+					  .arg(scroll->verticalScrollBar()->maximum());
+			reachable = reachable && total > 10 && scroll->verticalScrollBar()->maximum() > 0;
+			dlg->resize(opened);
+		}
+		check("C41", "Setup fits the screen and scrolls so every setting can be reached", fits && reachable,
+		      detail);
+	}
+
 	static bool isMarkerGreen(const uint8_t p[4]) { return p[0] <= 6 && p[1] >= 249 && p[2] <= 6; }
 	static QString px(const uint8_t p[4])
 	{
@@ -794,6 +844,7 @@ private:
 				      .arg(focused)
 				      .arg(typed)
 				      .arg(suppressed));
+			checkSetupScrolls();
 			for (auto *w : QApplication::topLevelWidgets())
 				if (w->windowTitle().contains("Setup"))
 					w->close();

@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.2.1 — 2026-10-24
+
+### Fixed
+- **Setup is now scrollable.** On smaller or scaled screens the bottom of the Setup window
+  (Replay / Highlights source, Create / Repair, the log) could be cut off with no way to
+  reach it. The settings now scroll inside the window, the Close button stays visible, and
+  Setup never opens larger than the screen.
+
 ## v1.2.0 — 2026-10-23
 
 ### Changed
