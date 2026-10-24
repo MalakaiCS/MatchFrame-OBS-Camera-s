@@ -1,4 +1,4 @@
-PASS A1: Commentary tone continuous across all camera and playback takes  [present in 100.0% of 100 ms windows over 115 s]
+PASS A1: Commentary tone continuous across all camera and playback takes  [present in 100.0% of 100 ms windows over 104 s]
 PASS A2: No replay/highlights audio while Replay waits in Preview (60 s)  [1 kHz 0.0%, 2 kHz 0.0%]
 PASS V1: Program shows the camera (not the clip) during the Preview wait  [(122, 165, 125)]
 PASS A3: Replay audio on Program only after the take  [1 kHz in 100.0% of the replay window]
@@ -7,4 +7,4 @@ PASS V2: Replay starts from its first frame on take (magenta marker visible)  [[
 PASS A5: Highlights audio on Program; replay audio stops when it leaves Program  [2 kHz 100.0%, 1 kHz 0.0%]
 PASS V3: Highlights starts from its first frame on take (yellow marker visible)  [[(250, 253, 9), (250, 253, 9), (250, 253, 9)]]
 PASS A6: Highlights audio stops after Return Live  [2 kHz 0.0%]
-recording: /tmp/claude-0/-home-user-MatchFrame-OBS-Camera-s/d90ea7cd-e274-5a15-b8bd-e5e0c14cfb70/scratchpad/rt5/rec/2026-10-23 23-36-57.mkv (114.7 s)
+recording: /tmp/claude-0/-home-user-MatchFrame-OBS-Camera-s/d90ea7cd-e274-5a15-b8bd-e5e0c14cfb70/scratchpad/rt6/rec/2026-10-24 05-23-11.mkv (103.6 s)

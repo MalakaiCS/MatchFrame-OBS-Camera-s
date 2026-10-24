@@ -15,70 +15,70 @@
             "detail": "ok=1 events=2 replay scene='' (not created until first play)",
             "id": "R01",
             "pass": true,
-            "t_ms": 286,
+            "t_ms": 801,
             "title": "Replay Cue detected in-process through obs-websocket (GetStatus / GetEvents)"
         },
         {
             "detail": "CueEvent calls=1, preview='Replay', program still CAM 1=1",
             "id": "R02",
             "pass": true,
-            "t_ms": 361,
+            "t_ms": 852,
             "title": "Key 9 asks Replay Cue to cue the selected replay; its Replay scene appears in Preview"
         },
         {
             "detail": "Resume calls=1 last camera slot=0",
             "id": "R03",
             "pass": true,
-            "t_ms": 382,
+            "t_ms": 878,
             "title": "CUT on the cued replay asks Replay Cue to play it (Resume); last camera kept"
         },
         {
             "detail": "",
             "id": "R04",
             "pass": true,
-            "t_ms": 466,
+            "t_ms": 893,
             "title": "Return Live asks Replay Cue to return (ReturnToLive) and Program goes back to CAM 1"
         },
         {
             "detail": "Replay Cue did not return to live - cut to the last live camera instead",
             "id": "R05",
             "pass": true,
-            "t_ms": 2981,
+            "t_ms": 3529,
             "title": "If Replay Cue cannot return, the multiview cuts to the last live camera itself"
         },
         {
             "detail": "PlayHighlights calls=1",
             "id": "R06",
             "pass": true,
-            "t_ms": 3119,
+            "t_ms": 3579,
             "title": "Key 0 stages the highlights reel; CUT plays it once (PlayHighlights), double press ignored"
         },
         {
             "detail": "selected=e1 speed=0.5",
             "id": "R07",
             "pass": true,
-            "t_ms": 4851,
+            "t_ms": 5306,
             "title": "Multiview controls drive Replay Cue: Instant Replay, 50% speed, previous replay, marks, angle"
         },
         {
             "detail": "Replay Cue: No request was found by that name.",
             "id": "R07b",
             "pass": true,
-            "t_ms": 4852,
+            "t_ms": 5307,
             "title": "An unknown / failing Replay Cue request is reported, not ignored"
         },
         {
             "detail": "",
             "id": "R08",
             "pass": true,
-            "t_ms": 5183,
+            "t_ms": 5416,
             "title": "Camera Preview / CUT is unchanged in Replay Cue mode"
         },
         {
             "detail": "Replay: Playback is not READY - load and arm a file first",
             "id": "R09",
             "pass": true,
-            "t_ms": 5256,
+            "t_ms": 5465,
             "title": "With the built-in provider, 9 never calls Replay Cue"
         }
     ],

@@ -30,9 +30,9 @@ feeds (`tests/media/cam1..8.mp4` as looping Media Sources) and the two test clip
 Commentary is a looping 440 Hz tone on a global audio channel. OBS records Program and
 `analyze-recording.py` checks the recording. Phase 2 restarts OBS.
 
-**Final run (1.2.0 code):** phase 1 **44/44 PASS**, phase 2 **8/8 PASS**, phase 3 **10/10
-PASS**, recording analysis **9/9 PASS** (115 s recording; this run used a 10 s performance
-window, so the performance figures in section 4 are from the earlier 30 s run).
+**Final run (1.2.1 code):** phase 1 **45/45 PASS**, phase 2 **8/8 PASS**, phase 3 **10/10
+PASS**, recording analysis **9/9 PASS** (104 s recording; this run used a 5 s performance
+window, so the performance figures in section 4 are from an earlier 30 s run).
 
 **Long run (30-min soak, previous build):** phase 1 41/42 and phase 2 8/8. 449 takes ran
 across cameras, Replay, Highlights and Return Live, with 0 rejected. Commentary was
@@ -89,7 +89,7 @@ During the soak, a compile job ran concurrently for a few minutes.
 | C39 | Repair and assignment refused while recording; structure unchanged | PASS |
 | C40 | Graphics on Program only: every camera scene rendered as a multiview tile shows the camera (centre pixel = camera), the same scene rendered normally shows the overlay, and OBS's Program output shows the overlay; filter present on the graphics source | PASS* |
 | C40b | With the option off, the tiles show the overlay again; back on, clean again | PASS* |
-| C41 | Setup opens within the screen and, shrunk to 800×420, scrolls every button into view | PENDING-RUN |
+| C41 | Setup opens within the screen and, shrunk to 800×420, scrolls every button into view (23 buttons, scroll range 847 px) | PASS |
 | P01–P05 | After an OBS restart: 10 scenes, UUID assignments, renamed scene, labels / URL / files, last live camera, playback re-armed | PASS |
 | P06–P08 | Switching to a new collection gives an empty bank with no stale references; switching back restores the bank; playback re-armed | PASS |
 | A1 | Commentary tone continuous across every camera and playback take | PASS (100 % of windows; 2143 s in the soak) |
