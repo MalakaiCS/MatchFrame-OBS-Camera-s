@@ -20,6 +20,12 @@
 
 namespace mf {
 
+// Rows of the playback table: Replay, Highlights, Video Ads.
+static int pbSlot(int k)
+{
+	return k == 0 ? kSlotReplay : k == 1 ? kSlotHighlights : kSlotAds;
+}
+
 SetupDialog::SetupDialog(Controller *controller, QWidget *parent) : QDialog(parent), controller_(controller)
 {
 	setWindowTitle("MatchFrame Multiview – Setup");
@@ -155,23 +161,26 @@ void SetupDialog::build()
 	root->addWidget(gBox);
 
 	// --- Playback
-	auto *pBox = new QGroupBox("Playback scenes (prepared files; independent of camera graphics)", this);
+	auto *pBox = new QGroupBox("Playback scenes (prepared files; independent of camera graphics). Video Ads plays "
+				   "its ads in file-name order, once.",
+				   this);
 	auto *pl = new QGridLayout(pBox);
 	const char *pbHeaders[] = {"Scene", "Label", "File", "", "State", "Overlay URL (optional)", "", ""};
 	for (int c = 0; c < 8; c++)
 		pl->addWidget(new QLabel(QString("<b>%1</b>").arg(pbHeaders[c])), 0, c);
-	for (int k = 0; k < 2; k++) {
-		const int slot = k == 0 ? kSlotReplay : kSlotHighlights;
+	for (int k = 0; k < 3; k++) {
+		const int slot = pbSlot(k);
 		PbRow &r = pbs_[k];
 		r.scene = new QLabel;
 		r.label = new QLineEdit;
 		r.file = new QLabel;
 		r.file->setMinimumWidth(200);
-		r.browse = new QPushButton("Load / Arm…");
+		r.browse = new QPushButton(slot == kSlotAds ? "Load Ads…" : "Load / Arm…");
 		r.state = new QLabel;
 		r.overlayUrl = new QLineEdit;
 		r.overlayUrl->setEchoMode(QLineEdit::Password);
 		r.overlayUrl->setPlaceholderText(slot == kSlotReplay ? "e.g. REPLAY branding page"
+						 : slot == kSlotAds  ? "e.g. sponsor strap over the ads"
 								     : "Highlights branding page");
 		r.overlayOn = new QCheckBox("Show");
 		r.overlayApply = new QPushButton("Apply");
@@ -192,11 +201,23 @@ void SetupDialog::build()
 				controller_->setMessage(QString::fromStdString(v.modifyBlockReason), true);
 				return;
 			}
-			QString path = QFileDialog::getOpenFileName(
-				this, "Choose prepared media", QString(),
-				"Media files (*.mp4 *.mov *.mkv *.m4v *.ts *.webm *.avi *.mxf *.flv);;All files (*)");
-			if (!path.isEmpty())
-				controller_->loadPlayback(slot, path);
+			const QString filter =
+				"Media files (*.mp4 *.mov *.mkv *.m4v *.ts *.webm *.avi *.mxf *.flv);;All files (*)";
+			if (slot == kSlotAds) {
+				QStringList files = QFileDialog::getOpenFileNames(
+					this, "Choose video ads (they play in file-name order)", QString(), filter);
+				std::sort(files.begin(), files.end(), [](const QString &a, const QString &b) {
+					return QString::localeAwareCompare(QFileInfo(a).fileName(),
+									   QFileInfo(b).fileName()) < 0;
+				});
+				if (!files.isEmpty())
+					controller_->loadAdsPlaylist(files);
+			} else {
+				QString path =
+					QFileDialog::getOpenFileName(this, "Choose prepared media", QString(), filter);
+				if (!path.isEmpty())
+					controller_->loadPlayback(slot, path);
+			}
 			refreshStatus();
 		});
 		connect(r.overlayApply, &QPushButton::clicked, this, [this, k, slot]() {
@@ -216,6 +237,39 @@ void SetupDialog::build()
 		});
 	}
 	root->addWidget(pBox);
+
+	// --- Intermission
+	auto *iBox = new QGroupBox("Intermission (a graphics page shown full screen; no camera graphics)", this);
+	auto *il = new QGridLayout(iBox);
+	intermissionScene_ = new QLabel;
+	intermissionLabel_ = new QLineEdit;
+	intermissionUrl_ = new QLineEdit;
+	intermissionUrl_->setEchoMode(QLineEdit::Password); // URLs may carry access tokens
+	intermissionUrl_->setPlaceholderText("Intermission / break page URL (e.g. a MatchFrame break screen)");
+	auto *showIm = new QPushButton("Show");
+	showIm->setCheckable(true);
+	intermissionApply_ = new QPushButton("Apply");
+	intermissionApply_->setToolTip("Applying a changed URL reloads the intermission page");
+	il->addWidget(new QLabel("<b>Scene</b>"), 0, 0);
+	il->addWidget(new QLabel("<b>Label</b>"), 0, 1);
+	il->addWidget(new QLabel("<b>Page URL</b>"), 0, 2);
+	il->addWidget(intermissionScene_, 1, 0);
+	il->addWidget(intermissionLabel_, 1, 1);
+	il->addWidget(intermissionUrl_, 1, 2);
+	il->addWidget(showIm, 1, 3);
+	il->addWidget(intermissionApply_, 1, 4);
+	il->setColumnStretch(2, 1);
+	connect(showIm, &QPushButton::toggled, this,
+		[this](bool on) { intermissionUrl_->setEchoMode(on ? QLineEdit::Normal : QLineEdit::Password); });
+	connect(intermissionLabel_, &QLineEdit::editingFinished, this,
+		[this]() { controller_->setSlotLabel(kSlotIntermission, intermissionLabel_->text().trimmed()); });
+	connect(intermissionApply_, &QPushButton::clicked, this, [this]() {
+		QString msg;
+		controller_->applyIntermissionUrl(intermissionUrl_->text(), &msg);
+		controller_->setMessage(msg, false);
+		refreshStatus();
+	});
+	root->addWidget(iBox);
 
 	// --- Replay / Highlights provider
 	auto *rcBox = new QGroupBox("Replay / Highlights source", this);
@@ -305,12 +359,14 @@ void SetupDialog::reload()
 		r.input->setCurrentIndex(sel);
 	}
 	graphicsUrl_->setText(QString::fromStdString(cfg.graphicsUrl));
+	intermissionLabel_->setText(QString::fromStdString(cfg.intermission.label));
+	intermissionUrl_->setText(QString::fromStdString(cfg.intermission.graphicsUrl));
 	{
 		QSignalBlocker block(programOnly_);
 		programOnly_->setChecked(cfg.graphicsProgramOnly);
 	}
-	for (int k = 0; k < 2; k++) {
-		const int slot = k == 0 ? kSlotReplay : kSlotHighlights;
+	for (int k = 0; k < 3; k++) {
+		const int slot = pbSlot(k);
 		const PlaybackSlotConfig &p = cfg.playback(slot);
 		pbs_[k].label->setText(QString::fromStdString(p.label));
 		pbs_[k].overlayUrl->setText(QString::fromStdString(p.graphicsUrl));
@@ -383,13 +439,16 @@ void SetupDialog::refreshStatus()
 					     QString::fromStdString(redactUrl(cfg.graphicsUrl)).toHtmlEscaped()));
 	applyUrl_->setEnabled(controller_->collectionReady());
 
-	for (int k = 0; k < 2; k++) {
-		const int slot = k == 0 ? kSlotReplay : kSlotHighlights;
+	for (int k = 0; k < 3; k++) {
+		const int slot = pbSlot(k);
 		PlaybackView v = controller_->playback().view(slot);
 		OBSSourceAutoRelease scene = bank.slotScene(slot);
 		pbs_[k].scene->setText(scene ? QString::fromStdString(nameOf(scene)) : "<i>not created</i>");
-		pbs_[k].file->setText(v.fileName.empty() ? "<i>no file</i>"
-							 : QString::fromStdString(v.fileName).toHtmlEscaped());
+		QString fileText = v.fileName.empty() ? "<i>no file</i>"
+						      : QString::fromStdString(v.fileName).toHtmlEscaped();
+		if (v.playlistCount > 0)
+			fileText = QString("Ad %1/%2 · %3").arg(v.playlistIndex + 1).arg(v.playlistCount).arg(fileText);
+		pbs_[k].file->setText(fileText);
 		pbs_[k].file->setToolTip(QString::fromStdString(v.file));
 		QString st = playbackStateName(v.state);
 		if (!v.error.empty())
@@ -403,6 +462,13 @@ void SetupDialog::refreshStatus()
 		pbs_[k].overlayUrl->setEnabled(browserOk);
 		pbs_[k].overlayOn->setEnabled(browserOk);
 		pbs_[k].overlayApply->setEnabled(browserOk);
+	}
+
+	{
+		OBSSourceAutoRelease scene = bank.slotScene(kSlotIntermission);
+		intermissionScene_->setText(scene ? QString::fromStdString(nameOf(scene)) : "<i>not created</i>");
+		intermissionApply_->setEnabled(controller_->graphics().browserSupported() &&
+					       controller_->collectionReady());
 	}
 
 	QString why;

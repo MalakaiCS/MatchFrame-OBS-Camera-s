@@ -78,3 +78,11 @@ FPS at the top of your results.
 - [ ] ≥ 30 min with eight camera inputs, two loaded playback files, graphics and recording, with repeated takes.
       Record CPU/GPU, *rendering lag* and *encoding lag* (OBS Stats dock) with the multiview **open vs closed**.
 - [ ] Note input-to-Program behaviour per input type (decoding/bandwidth limits are OBS/input properties, not plugin cost).
+
+## Intermission and Video Ads
+- [ ] (auto) Create / Repair adds `MF — INTERMISSION` (its page only) and `MF — VIDEO ADS` (its media source only).
+- [ ] With a real Browser Source: set the Intermission URL → its tile shows the page; `-` then CUT takes it; Return Live
+      goes back to the last camera.
+- [ ] (auto) Load two or more ads → READY on ad 1; `=` then CUT → they play in order; after the last: ENDED, no
+      auto-switch; Return Live → re-armed at ad 1.
+- [ ] Ad audio is heard only while Video Ads is on Program.

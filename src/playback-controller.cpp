@@ -30,9 +30,16 @@ MediaState toMediaState(enum obs_media_state s)
 	}
 }
 
-static int idx(int slot)
+static const char *slotName(int slot)
 {
-	return slot == kSlotReplay ? 0 : 1;
+	return slot == kSlotReplay ? "replay" : slot == kSlotAds ? "video ads" : "highlights";
+}
+
+static std::string currentFile(obs_source_t *media)
+{
+	OBSDataAutoRelease cur = obs_source_get_settings(media);
+	const char *f = obs_data_get_string(cur, "local_file");
+	return f ? f : "";
 }
 
 static bool fileExists(const std::string &p)
@@ -44,8 +51,8 @@ PlaybackController::PlaybackController(SceneBank &bank) : bank_(bank) {}
 
 PlaybackController::~PlaybackController()
 {
-	disconnectSignals(kSlotReplay);
-	disconnectSignals(kSlotHighlights);
+	for (int slot : kSlots)
+		disconnectSignals(slot);
 }
 
 PlaybackView PlaybackController::view(int slot)
@@ -70,6 +77,12 @@ PlaybackView PlaybackController::view(int slot)
 		v.canModify = v.modifyBlockReason.empty();
 	} else {
 		v.modifyBlockReason = "Playback scene not set up - run Create / Repair";
+	}
+	if (slot == kSlotAds) {
+		v.playlistCount = (int)bank_.config().ads.playlist.size();
+		v.playlistIndex = adsIndex_;
+		if (media && v.playlistCount > 0)
+			v.fileName = QFileInfo(QString::fromStdString(currentFile(media))).fileName().toStdString();
 	}
 	return v;
 }
@@ -105,11 +118,15 @@ void PlaybackController::perform(int slot, PlaybackAction action, obs_source_t *
 	PlaybackSlotLogic &l = logic(slot);
 	switch (action) {
 	case PlaybackAction::SetFileAndOpen:
+		if (slot == kSlotAds)
+			adsIndex_ = 0;
 		reloadFile(media, l.file());
-		obs_log(LOG_INFO, "%s: loading '%s'", slot == kSlotReplay ? "replay" : "highlights",
+		obs_log(LOG_INFO, "%s: loading '%s'", slotName(slot),
 			QFileInfo(QString::fromStdString(l.file())).fileName().toUtf8().constData());
 		break;
 	case PlaybackAction::PauseSeekStart: {
+		if (slot == kSlotAds)
+			rewindPlaylist(slot, media);
 		MediaState st = toMediaState(obs_source_media_get_state(media));
 		if (st == MediaState::Ended || st == MediaState::Stopped || st == MediaState::None ||
 		    st == MediaState::Error)
@@ -119,9 +136,16 @@ void PlaybackController::perform(int slot, PlaybackAction action, obs_source_t *
 		break;
 	}
 	case PlaybackAction::Restart:
-		obs_source_media_restart(media);
-		obs_log(LOG_INFO, "%s: on Program - playing from the beginning",
-			slot == kSlotReplay ? "replay" : "highlights");
+		if (slot == kSlotAds && adsIndex_ != 0) {
+			// Restart means the whole playlist: back to the first ad.
+			reloadFile(media, l.file());
+			adsIndex_ = 0;
+			adsAdvancedAtMs_ = nowMs();
+			obs_source_media_play_pause(media, false);
+		} else {
+			obs_source_media_restart(media);
+		}
+		obs_log(LOG_INFO, "%s: on Program - playing from the beginning", slotName(slot));
 		break;
 	case PlaybackAction::PlayPause: {
 		bool playing = obs_source_media_get_state(media) == OBS_MEDIA_STATE_PLAYING;
@@ -156,6 +180,73 @@ bool PlaybackController::load(int slot, const std::string &path, std::string *me
 	if (message)
 		*message = "Loading…";
 	return true;
+}
+
+bool PlaybackController::loadPlaylist(int slot, const std::vector<std::string> &files, std::string *message)
+{
+	if (slot != kSlotAds)
+		return false;
+	std::vector<std::string> list;
+	for (const auto &f : files)
+		if (!f.empty())
+			list.push_back(f);
+	if (list.empty()) {
+		if (message)
+			*message = "No ads selected";
+		return false;
+	}
+	for (const auto &f : list)
+		if (!fileExists(f)) {
+			if (message)
+				*message = "File not found: " +
+					   QFileInfo(QString::fromStdString(f)).fileName().toStdString();
+			return false;
+		}
+	std::vector<std::string> previous = bank_.config().ads.playlist;
+	bank_.config().ads.playlist = list;
+	if (!load(slot, list.front(), message)) {
+		bank_.config().ads.playlist = previous;
+		return false;
+	}
+	adsIndex_ = 0;
+	obs_log(LOG_INFO, "video ads: playlist of %d ad(s) loaded", (int)list.size());
+	if (message)
+		*message = "Loading " + std::to_string(list.size()) + " ad(s)…";
+	return true;
+}
+
+bool PlaybackController::advancePlaylist(obs_source_t *media)
+{
+	const auto &list = bank_.config().ads.playlist;
+	for (int next = adsIndex_ + 1; next < (int)list.size(); next++) {
+		if (!fileExists(list[(size_t)next])) {
+			obs_log(LOG_WARNING, "video ads: skipping missing ad %d", next + 1);
+			continue;
+		}
+		OBSDataAutoRelease s = obs_data_create();
+		SceneBank::applyMediaDefaults(s);
+		obs_data_set_string(s, "local_file", list[(size_t)next].c_str());
+		obs_source_update(media, s); // the source is live: it opens and plays at once
+		obs_source_media_play_pause(media, false);
+		adsIndex_ = next;
+		adsAdvancedAtMs_ = nowMs();
+		obs_log(LOG_INFO, "video ads: playing ad %d of %d", next + 1, (int)list.size());
+		return true;
+	}
+	return false;
+}
+
+void PlaybackController::rewindPlaylist(int slot, obs_source_t *media)
+{
+	const std::string &first = logic(slot).file();
+	if (first.empty())
+		return;
+	if (adsIndex_ != 0 || currentFile(media) != first) {
+		reloadFile(media, first);
+		obs_log(LOG_INFO, "video ads: back to the first ad");
+	}
+	adsIndex_ = 0;
+	adsAdvancedAtMs_ = -1;
 }
 
 bool PlaybackController::rearm(int slot, std::string *message)
@@ -204,6 +295,8 @@ bool PlaybackController::restart(int slot, std::string *message)
 	}
 	if (!obs_source_showing(media)) {
 		// OBS ignores restart for a source nobody is showing; reopen instead.
+		if (slot == kSlotAds)
+			adsIndex_ = 0;
 		reloadFile(media, logic(slot).file());
 		obs_source_media_play_pause(media, false);
 		return true;
@@ -214,7 +307,7 @@ bool PlaybackController::restart(int slot, std::string *message)
 
 void PlaybackController::poll(int programSlot)
 {
-	for (int slot : {kSlotReplay, kSlotHighlights}) {
+	for (int slot : kSlots) {
 		PlaybackSlotLogic &l = logic(slot);
 		OBSSourceAutoRelease media = bank_.mediaSource(slot);
 		if (!media) {
@@ -241,18 +334,32 @@ void PlaybackController::poll(int programSlot)
 		obs.durationMs = obs_source_media_get_duration(media);
 		obs.timeMs = obs_source_media_get_time(media);
 		obs.hasFrame = obs_source_get_width(media) > 0;
+		if (slot == kSlotAds && l.onProgram()) {
+			// One ad ended while live: the playlist carries on with the next one. Only
+			// the last ad's end is reported as ENDED (no automatic scene change).
+			if (adsAdvancedAtMs_ >= 0) {
+				if (obs.state == MediaState::Playing || now - adsAdvancedAtMs_ > 3000)
+					adsAdvancedAtMs_ = -1;
+				else
+					continue; // the next ad is still opening
+			}
+			if ((obs.state == MediaState::Ended || obs.state == MediaState::Stopped) &&
+			    l.state() == PlaybackState::Playing && advancePlaylist(media))
+				continue;
+		}
 		PlaybackState before = l.state();
 		perform(slot, l.observe(obs, now), media);
 		if (before != l.state())
-			obs_log(LOG_INFO, "%s: %s -> %s%s%s", slot == kSlotReplay ? "replay" : "highlights",
-				playbackStateName(before), playbackStateName(l.state()), l.error().empty() ? "" : " - ",
-				l.error().c_str());
+			obs_log(LOG_INFO, "%s: %s -> %s%s%s", slotName(slot), playbackStateName(before),
+				playbackStateName(l.state()), l.error().empty() ? "" : " - ", l.error().c_str());
 	}
 }
 
 void PlaybackController::resume(int programSlot)
 {
-	for (int slot : {kSlotReplay, kSlotHighlights}) {
+	adsIndex_ = 0;
+	adsAdvancedAtMs_ = -1;
+	for (int slot : kSlots) {
 		PlaybackSlotLogic &l = logic(slot);
 		l.reset();
 		OBSSourceAutoRelease media = bank_.mediaSource(slot);
@@ -261,6 +368,8 @@ void PlaybackController::resume(int programSlot)
 			continue;
 		connectSignals(slot, media);
 		bool onProgram = programSlot == slot;
+		if (slot == kSlotAds && !onProgram && currentFile(media) != path && fileExists(path))
+			reloadFile(media, path); // saved mid-playlist: start from the first ad again
 		l.adoptExisting(path, fileExists(path), onProgram, nowMs());
 		if (!onProgram && fileExists(path)) {
 			// Saved sources start decoding on load (restart_on_activate is off): pause now.
@@ -271,10 +380,12 @@ void PlaybackController::resume(int programSlot)
 
 void PlaybackController::suspend()
 {
-	for (int slot : {kSlotReplay, kSlotHighlights}) {
+	for (int slot : kSlots) {
 		disconnectSignals(slot);
 		logic(slot).reset();
 	}
+	adsIndex_ = 0;
+	adsAdvancedAtMs_ = -1;
 }
 
 void PlaybackController::onMediaSignal(void *data, calldata_t *)
@@ -298,7 +409,7 @@ static const char *kSignals[] = {"media_ended", "media_started", "media_pause", 
 
 void PlaybackController::connectSignals(int slot, obs_source_t *media)
 {
-	OBSWeakSourceAutoRelease &w = connected_[idx(slot)];
+	OBSWeakSourceAutoRelease &w = connected_[index(slot)];
 	if (w && obs_weak_source_references_source(w, media))
 		return;
 	disconnectSignals(slot);
@@ -310,7 +421,7 @@ void PlaybackController::connectSignals(int slot, obs_source_t *media)
 
 void PlaybackController::disconnectSignals(int slot)
 {
-	OBSWeakSourceAutoRelease &w = connected_[idx(slot)];
+	OBSWeakSourceAutoRelease &w = connected_[index(slot)];
 	if (!w)
 		return;
 	OBSSourceAutoRelease src = obs_weak_source_get_source(w);

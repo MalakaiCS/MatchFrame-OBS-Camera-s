@@ -50,12 +50,16 @@ private:
 
 	Controller *controller_;
 	std::array<CamRow, 8> cams_;
-	std::array<PbRow, 2> pbs_;
+	std::array<PbRow, 3> pbs_; // Replay, Highlights, Video Ads
 	QLineEdit *graphicsUrl_ = nullptr;
 	QPushButton *showUrl_ = nullptr;
 	QPushButton *applyUrl_ = nullptr;
 	QLabel *graphicsState_ = nullptr;
 	QCheckBox *programOnly_ = nullptr;
+	QLabel *intermissionScene_ = nullptr;
+	QLineEdit *intermissionLabel_ = nullptr;
+	QLineEdit *intermissionUrl_ = nullptr;
+	QPushButton *intermissionApply_ = nullptr;
 	QLabel *canvas_ = nullptr;
 	QPushButton *repair_ = nullptr;
 	QLabel *repairNote_ = nullptr;

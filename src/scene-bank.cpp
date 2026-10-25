@@ -15,17 +15,62 @@ std::string SceneBank::sceneRole(int slot)
 		return "scene:replay";
 	if (slot == kSlotHighlights)
 		return "scene:highlights";
+	if (slot == kSlotIntermission)
+		return "scene:intermission";
+	if (slot == kSlotAds)
+		return "scene:ads";
 	return "scene:cam" + std::to_string(slot + 1);
+}
+
+static const char *slotKey(int slot)
+{
+	switch (slot) {
+	case kSlotReplay:
+		return "replay";
+	case kSlotIntermission:
+		return "intermission";
+	case kSlotAds:
+		return "ads";
+	default:
+		return "highlights";
+	}
 }
 
 std::string SceneBank::mediaRole(int slot)
 {
-	return slot == kSlotReplay ? "media:replay" : "media:highlights";
+	return std::string("media:") + slotKey(slot);
 }
 
 std::string SceneBank::playbackGraphicsRole(int slot)
 {
-	return slot == kSlotReplay ? "graphics:replay" : "graphics:highlights";
+	return std::string("graphics:") + slotKey(slot);
+}
+
+// Display names of the sources the plugin creates for slots 8..11.
+static std::string mediaBaseName(int slot)
+{
+	switch (slot) {
+	case kSlotReplay:
+		return "MF — Replay Media";
+	case kSlotAds:
+		return "MF — Video Ads Media";
+	default:
+		return "MF — Highlights Media";
+	}
+}
+
+static std::string graphicsBaseName(int slot)
+{
+	switch (slot) {
+	case kSlotReplay:
+		return "MF — Replay Graphics";
+	case kSlotIntermission:
+		return "MF — Intermission Graphics";
+	case kSlotAds:
+		return "MF — Video Ads Graphics";
+	default:
+		return "MF — Highlights Graphics";
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -38,7 +83,7 @@ static std::string &sceneUuidRef(BankConfig &c, int slot)
 
 OBSSourceAutoRelease SceneBank::slotScene(int slot) const
 {
-	if (slot < 0 || slot >= 10)
+	if (slot < 0 || slot >= kSlotCount)
 		return nullptr;
 	std::string &uuid = sceneUuidRef(cfg_, slot);
 	const std::string role = sceneRole(slot);
@@ -85,7 +130,7 @@ OBSSourceAutoRelease SceneBank::cameraInput(int cam)
 
 OBSSourceAutoRelease SceneBank::mediaSource(int slot) const
 {
-	if (slot != kSlotReplay && slot != kSlotHighlights)
+	if (!slotIsPlayback(slot))
 		return nullptr;
 	PlaybackSlotConfig &p = cfg_.playback(slot);
 	OBSSourceAutoRelease src = sourceByUuid(p.mediaUuid);
@@ -131,6 +176,10 @@ int SceneBank::slotOfSceneUuid(const std::string &uuid) const
 		return kSlotReplay;
 	if (cfg_.highlights.sceneUuid == uuid)
 		return kSlotHighlights;
+	if (cfg_.intermission.sceneUuid == uuid)
+		return kSlotIntermission;
+	if (cfg_.ads.sceneUuid == uuid)
+		return kSlotAds;
 	return -1;
 }
 
@@ -141,7 +190,7 @@ int SceneBank::slotOfScene(obs_source_t *scene) const
 
 bool SceneBank::anySceneExists() const
 {
-	for (int i = 0; i < 10; i++) {
+	for (int i = 0; i < kSlotCount; i++) {
 		OBSSourceAutoRelease s = slotScene(i);
 		if (s)
 			return true;
@@ -351,7 +400,7 @@ OBSSourceAutoRelease SceneBank::resolveOrCreateMedia(int slot, RepairReport &r)
 	OBSDataAutoRelease settings = obs_data_create();
 	applyMediaDefaults(settings);
 	obs_data_set_string(settings, "local_file", p.filePath.c_str());
-	const std::string base = slot == kSlotReplay ? "MF — Replay Media" : "MF — Highlights Media";
+	const std::string base = mediaBaseName(slot);
 	const std::string name = uniqueSourceName(base);
 	if (name != base)
 		r.warn("'" + base + "' is used by an unrelated object; created '" + name + "' instead");
@@ -458,7 +507,7 @@ void SceneBank::repairPlaybackScene(int slot, RepairReport &r)
 	// Optional playback overlay: only when a URL is configured.
 	OBSSourceAutoRelease pg;
 	if (!p.graphicsUrl.empty() && browserAvailable()) {
-		const std::string base = slot == kSlotReplay ? "MF — Replay Graphics" : "MF — Highlights Graphics";
+		const std::string base = graphicsBaseName(slot);
 		pg = resolveOrCreateBrowser(p.graphicsUuid, playbackGraphicsRole(slot), base, p.graphicsUrl, r,
 					    p.graphicsUuid);
 	} else {
@@ -482,6 +531,45 @@ void SceneBank::repairPlaybackScene(int slot, RepairReport &r)
 	}
 }
 
+// Intermission: one full-canvas Browser Source showing the intermission page. The
+// camera overlay is never added here.
+void SceneBank::repairIntermissionScene(RepairReport &r)
+{
+	OBSSourceAutoRelease sceneSrc = resolveOrCreateScene(kSlotIntermission, r);
+	obs_scene_t *scene = obs_scene_from_source(sceneSrc);
+	if (!scene)
+		return;
+	PlaybackSlotConfig &p = cfg_.intermission;
+	p.sceneName = nameOf(sceneSrc);
+	if (!sceneTransitionOverride(sceneSrc).empty()) {
+		clearTransitionOverride(sceneSrc);
+		r.add("Removed per-scene transition override from '" + p.sceneName + "'");
+	}
+	if (!browserAvailable()) {
+		r.warn("Browser Source is not available - the Intermission scene has no graphics page");
+		return;
+	}
+	OBSSourceAutoRelease page = resolveOrCreateBrowser(p.graphicsUuid, playbackGraphicsRole(kSlotIntermission),
+							   graphicsBaseName(kSlotIntermission), p.graphicsUrl, r,
+							   p.graphicsUuid);
+	if (!page)
+		return;
+	if (p.graphicsUrl.empty())
+		r.warn("No Intermission URL set yet - enter it in Setup and press Apply");
+	obs_sceneitem_t *item = itemByIdAndSource(scene, p.graphicsItemId, page);
+	if (!item) {
+		auto v = itemsWithSource(scene, page);
+		item = v.empty() ? nullptr : v.front();
+	}
+	if (!item) {
+		item = obs_scene_add(scene, page);
+		obs_sceneitem_set_locked(item, true);
+		r.created++;
+	}
+	obs_sceneitem_set_visible(item, true);
+	p.graphicsItemId = obs_sceneitem_get_id(item);
+}
+
 RepairReport SceneBank::createOrRepair()
 {
 	RepairReport r;
@@ -500,6 +588,8 @@ RepairReport SceneBank::createOrRepair()
 		repairCameraScene(cam, browser, r);
 	repairPlaybackScene(kSlotReplay, r);
 	repairPlaybackScene(kSlotHighlights, r);
+	repairIntermissionScene(r);
+	repairPlaybackScene(kSlotAds, r);
 
 	obs_log(LOG_INFO, "Create/Repair: %d created, %d reused, %d warnings", r.created, r.reused, r.warnings);
 	for (auto &l : r.lines)
@@ -612,7 +702,7 @@ std::vector<int> SceneBank::slotsSharingInput(int cam) const
 
 void SceneBank::refreshNames()
 {
-	for (int i = 0; i < 10; i++) {
+	for (int i = 0; i < kSlotCount; i++) {
 		OBSSourceAutoRelease s = slotScene(i);
 		if (!s)
 			continue;

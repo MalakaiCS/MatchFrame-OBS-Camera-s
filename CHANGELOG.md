@@ -1,5 +1,29 @@
 # Changelog
 
+## v1.3.0 — 2026-10-25
+
+### Added
+- **Intermission scene** (`MF — INTERMISSION`). It shows a graphics page full screen (Setup →
+  Intermission: page URL + Apply). It has its own multiview tile showing the page, key **-**,
+  and an OBS hotkey.
+- **Video Ads scene** (`MF — VIDEO ADS`). It plays a playlist of ad files in file-name order:
+  - the first ad arms paused off-air (READY), with no audio until live;
+  - on Program the ads play back to back, then hold on the last frame (ENDED) with no
+    automatic scene change;
+  - when it leaves Program it re-arms at the first ad.
+
+  It has a tile, key **=**, a control panel (Load Ads…, Arm, Play, Restart, *Ad n/N*), an OBS
+  hotkey, and an optional overlay URL.
+- Neither new scene carries the camera graphics, and neither changes the camera Return Live
+  goes back to. Both stay the plugin's own when Replay Cue provides Replay / Highlights.
+
+### Changed
+- The multiview now has 14 panes:
+  - **Wide:** cameras 1–4 + Replay + Intermission, then cameras 5–8 + Highlights + Video Ads.
+  - **Stacked:** a bottom row of Replay, Highlights, Intermission and Video Ads.
+- Existing collections keep their ten scenes. Run **Create / Repair** once to add the two
+  new ones.
+
 ## v1.2.1 — 2026-10-24
 
 ### Fixed

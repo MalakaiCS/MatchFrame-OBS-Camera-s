@@ -1,10 +1,11 @@
 # MatchFrame Multiview (OBS Studio plugin)
 
-A native OBS Studio plugin for live sports production. It builds a bank of **ten
-production scenes**: eight camera scenes, **Replay** and **Highlights**. It opens a native
-**twelve-pane multiview**: all ten scene tiles plus the actual OBS **Preview** and
-**Program**. Operators stage a tile in Preview, hard-**CUT** it to Program, run prepared
-replay / half-time / full-time media, and **Return Live** to the last camera.
+A native OBS Studio plugin for live sports production. It builds a bank of **twelve
+production scenes**: eight camera scenes, **Replay**, **Highlights**, **Intermission** and
+**Video Ads**. It opens a native **fourteen-pane multiview**: all twelve scene tiles plus the
+actual OBS **Preview** and **Program**. Operators stage a tile in Preview, hard-**CUT** it to
+Program, run prepared replay / half-time / full-time media, an intermission page or a run
+of video ads, and **Return Live** to the last camera.
 
 OBS still does everything else: capture, composition, encoding, recording and streaming.
 The existing MatchFrame graphics output is used as a transparent Browser Source. One
@@ -31,8 +32,10 @@ API, endpoints or credentials.
 | `MF — CAM 01` … `MF — CAM 08` | your existing OBS camera input → `MF — MatchFrame Overlay` (shared Browser Source reference) | Main Wide, Tight / Follow, Left Goal, Right Goal, Sideline, Reverse Angle, Bench / Crowd, Handheld / Spare |
 | `MF — REPLAY` | `MF — Replay Media` (Media Source) → optional `MF — Replay Graphics` | Replay |
 | `MF — HIGHLIGHTS` | `MF — Highlights Media` (Media Source) → optional `MF — Highlights Graphics` | Half-Time / Full-Time Highlights |
+| `MF — INTERMISSION` | `MF — Intermission Graphics` (Browser Source with your intermission page URL) | Intermission |
+| `MF — VIDEO ADS` | `MF — Video Ads Media` (Media Source playing your ads playlist) → optional `MF — Video Ads Graphics` | Video Ads |
 
-* There are exactly ten scenes and no hidden "graphics helper" scene. Unrelated scenes in
+* There are exactly twelve scenes and no hidden "graphics helper" scene. Unrelated scenes in
   your collection are left alone.
 * The scenes are ordinary OBS scenes. You can rename them and edit them; ownership is
   tracked by UUID and a private marker, never by name.
@@ -47,14 +50,14 @@ surface, with Qt controls kept outside it:
 │        [ PREVIEW — scene name ]  (green)          [ PROGRAM — scene name ]  (red)        │
 │        [ 1 ] [ 2 ] [ 3 ] [ 4 ]                                                          │
 │        [ 5 ] [ 6 ] [ 7 ] [ 8 ]                                                          │
-│              [ REPLAY ] [ HIGHLIGHTS ]                                                   │
+│     [ REPLAY ] [ HIGHLIGHTS ] [ INTERMISSION ] [ VIDEO ADS ]                             │
 ├ REPLAY  file · READY/PLAYING/PAUSED/ENDED/ERROR · 0:03 / 0:08 · Load / Arm… · Arm · Play · Restart ┤
-└ HIGHLIGHTS …                                                                                    ┘
+└ HIGHLIGHTS … │ VIDEO ADS  Ad 1/3 · file · READY · Load Ads… · Arm · Play · Restart                ┘
 ```
 
 The layout adapts to the window. On 16:9 and wider screens it switches to a wide
-arrangement: cameras 1–4 + Replay, then cameras 5–8 + Highlights, under the monitors. That
-drops a row, so every pane is larger. Tall windows keep the stacked rows shown above. Use
+arrangement under the monitors: cameras 1–4 + Replay + Intermission, then cameras 5–8 +
+Highlights + Video Ads. That drops a row, so the monitors are larger. Tall windows keep the stacked rows shown above. Use
 **Full Screen** for the largest panes.
 
 Every tile shows its composed OBS scene. By default the camera tiles and the Preview pane
@@ -70,17 +73,17 @@ read from OBS's real output state.
 
 ### Linux (built and tested: x86_64, OBS 30.2.x)
 
-Per-user install from `dist/matchframe-multiview-1.2.1-linux-x86_64.tar.gz`:
+Per-user install from `dist/matchframe-multiview-1.3.0-linux-x86_64.tar.gz`:
 
 ```bash
 mkdir -p ~/.config/obs-studio/plugins
-tar -xzf matchframe-multiview-1.2.1-linux-x86_64.tar.gz -C ~/.config/obs-studio/plugins
+tar -xzf matchframe-multiview-1.3.0-linux-x86_64.tar.gz -C ~/.config/obs-studio/plugins
 # result: ~/.config/obs-studio/plugins/matchframe-multiview/bin/64bit/matchframe-multiview.so
 #         ~/.config/obs-studio/plugins/matchframe-multiview/data/locale/en-US.ini
 ```
 
-Or install system-wide with the Debian package (`dist/matchframe-multiview-1.2.1-x86_64-linux-gnu.deb`):
-`sudo apt install ./matchframe-multiview-1.2.1-x86_64-linux-gnu.deb`.
+Or install system-wide with the Debian package (`dist/matchframe-multiview-1.3.0-x86_64-linux-gnu.deb`):
+`sudo apt install ./matchframe-multiview-1.3.0-x86_64-linux-gnu.deb`.
 
 Restart OBS. **Tools → MatchFrame Multiview** should appear, and the OBS log should show
 `[matchframe-multiview] plugin loaded successfully`.
@@ -99,17 +102,17 @@ across major versions, so build from source for any other OBS version (see §8).
 Built by CI on GitHub's `windows-2022` runners (MSVC, against OBS 31.1.1 from
 `buildspec.json`). **Compiled, not runtime-tested.**
 
-* **Installer:** run `matchframe-multiview-1.2.1-windows-x64-Installer.exe`. Close OBS first.
+* **Installer:** run `matchframe-multiview-1.3.0-windows-x64-Installer.exe`. Close OBS first.
   It installs into `%ProgramData%\obs-studio\plugins\matchframe-multiview\`, which OBS 30+
   loads automatically, and registers an uninstaller under *Settings → Apps*.
-* **Manual:** extract `matchframe-multiview-1.2.1-windows-x64.zip` into
+* **Manual:** extract `matchframe-multiview-1.3.0-windows-x64.zip` into
   `%ProgramData%\obs-studio\plugins\`. To uninstall, delete that folder.
 
 ### macOS (universal: Apple silicon + Intel, OBS 30 or newer)
 
 Built by CI on GitHub's `macos-15` runners. **Compiled, not runtime-tested.**
 
-* **Installer:** open `matchframe-multiview-1.2.1-macos-universal.pkg`. It installs
+* **Installer:** open `matchframe-multiview-1.3.0-macos-universal.pkg`. It installs
   `matchframe-multiview.plugin` into `~/Library/Application Support/obs-studio/plugins/`.
   The package is **unsigned and not notarized**, because no Apple Developer ID is set up in CI.
   macOS will block it the first time: right-click (or Control-click) the `.pkg` and choose
@@ -164,10 +167,11 @@ when that reloads the page. Camera cuts never touch the browser.
 
 | Action | Result |
 |---|---|
-| Click a camera / Replay / Highlights tile | Puts that scene in OBS **Preview**. Program is unchanged. |
+| Click any scene tile | Puts that scene in OBS **Preview**. Program is unchanged. |
 | **CUT** button or **Space** | Hard cut of the actual OBS Preview to Program (selects OBS's *Cut* transition) |
 | Keys **1–8** | Preview camera 1–8 |
 | Key **9** / **0** | Preview Replay / Highlights (must be READY) |
+| Key **-** / **=** | Preview Intermission / Video Ads (Video Ads must be READY) |
 | **Return Live** | **Immediate on-air cut** to the last camera that was actually on Program. Preview is left as it is. |
 | **Esc** | Leave full screen |
 | Double-click a tile | Edit its label |
@@ -176,7 +180,8 @@ when that reloads the page. Camera cuts never touch the browser.
 * Shortcuts work only while the multiview window has focus. Held-key auto-repeat is
   ignored. Typing in any field, picker or dialog never switches.
 * **OBS hotkeys** (Settings → Hotkeys): *MatchFrame: Preview Camera 1–8*, *Preview
-  Replay*, *Preview Highlights*, *CUT*, *Return Live*. They're **unbound by default**,
+  Replay*, *Preview Highlights*, *Preview Intermission*, *Preview Video Ads*, *CUT*,
+  *Return Live*. They're **unbound by default**,
   to avoid collisions and accidental takes.
 * CUT is serialized. Repeated presses while a take is in progress are dropped, not queued.
   CUT is refused while another OBS transition is still running.
@@ -225,6 +230,26 @@ Camera graphics (live clock/score) are **not** placed on playback scenes, so the
 Program when Replay or Highlights goes live and come back with the next camera. A live
 clock over a replay would mislead. Each playback scene can instead have its own optional
 overlay URL (e.g. "REPLAY" branding) in Setup, independent of the camera toggle.
+
+### Intermission and Video Ads
+
+* **Intermission** shows a graphics page full screen, for example a MatchFrame break or
+  "back soon" screen. In **Setup → Intermission**, paste the page URL and press **Apply**
+  (the field is masked, like the other URLs). Its tile shows the page, so you can see it
+  before it goes live. Press **-** (or click the tile), then **CUT**.
+* **Video Ads** plays a list of ad files in a row. Press **Load Ads…** on the Video Ads
+  panel (or in Setup) and select one or more files. They play in **file-name order**, so
+  name them `01 …`, `02 …` to set the order. The first ad arms paused on its first frame
+  (READY), with no audio until it is live. Press **=** (or click the tile), then **CUT**:
+  the ads play one after another from the first. After the last ad the picture holds and
+  shows **ENDED**; the plugin never cuts away on its own. The panel shows which ad is
+  playing (*Ad 2/3*).
+* When Video Ads leaves Program it re-arms at the first ad for the next break. **Restart
+  (LIVE)** starts the list again from the first ad.
+* Neither scene carries the camera graphics (clock/score), and neither changes the camera
+  that **Return Live** goes back to. Video Ads can have its own optional overlay URL in
+  Setup, like Replay and Highlights.
+* Both are always the plugin's own, even when Replay Cue provides Replay and Highlights.
 
 ### Replay and Highlights from MatchFrame Replay Cue
 

@@ -197,6 +197,60 @@ TEST(layout_modes_all_valid)
 	}
 }
 
+TEST(layout_places_intermission_and_ads)
+{
+	LayoutInput in;
+	in.width = 1915;
+	in.height = 850;
+	in.mode = LayoutMode::Wide;
+	Layout w = computeLayout(in);
+	CHECK(w.valid);
+	// Wide: Intermission follows Replay on camera row 1, Video Ads follows Highlights on row 2.
+	CHECK(w.panes[kPaneIntermission].outer.y == w.panes[kPaneReplay].outer.y);
+	CHECK(w.panes[kPaneIntermission].outer.x > w.panes[kPaneReplay].outer.x);
+	CHECK(w.panes[kPaneAds].outer.y == w.panes[kPaneHighlights].outer.y);
+	CHECK(w.panes[kPaneAds].outer.x > w.panes[kPaneHighlights].outer.x);
+	CHECK(w.panes[kPaneAds].video.w == w.panes[kPaneCam1].video.w);
+	in.mode = LayoutMode::Stacked;
+	in.width = 1000;
+	in.height = 1400;
+	Layout st = computeLayout(in);
+	CHECK(st.valid);
+	// Stacked: one compact bottom row of Replay, Highlights, Intermission, Video Ads.
+	for (int p : {kPaneHighlights, kPaneIntermission, kPaneAds})
+		CHECK(st.panes[p].outer.y == st.panes[kPaneReplay].outer.y);
+	CHECK(st.panes[kPaneReplay].outer.x < st.panes[kPaneHighlights].outer.x);
+	CHECK(st.panes[kPaneHighlights].outer.x < st.panes[kPaneIntermission].outer.x);
+	CHECK(st.panes[kPaneIntermission].outer.x < st.panes[kPaneAds].outer.x);
+	CHECK(st.panes[kPaneReplay].outer.y > st.panes[kPaneCam1 + 4].outer.y);
+}
+
+TEST(slot_kinds)
+{
+	CHECK(slotIsCamera(0) && slotIsCamera(7) && !slotIsCamera(kSlotReplay));
+	CHECK(slotIsPlayback(kSlotReplay) && slotIsPlayback(kSlotHighlights) && slotIsPlayback(kSlotAds));
+	CHECK(!slotIsPlayback(kSlotIntermission) && !slotIsPlayback(3));
+	CHECK(slotIsReplayCue(kSlotReplay) && slotIsReplayCue(kSlotHighlights));
+	CHECK(!slotIsReplayCue(kSlotAds) && !slotIsReplayCue(kSlotIntermission));
+	CHECK(slotIsIntermission(kSlotIntermission) && kSlotCount == 12);
+	// Intermission and Ads are selectable when their scene exists; Ads needs to be armed.
+	SelectFacts f;
+	f.studioMode = true;
+	f.slot = kSlotIntermission;
+	f.slotFacts.sceneExists = true;
+	CHECK(evaluateSelect(f) == Reject::None);
+	f.slot = kSlotAds;
+	CHECK(evaluateSelect(f) == Reject::PlaybackNotReady);
+	f.slotFacts.playbackReady = true;
+	CHECK(evaluateSelect(f) == Reject::None);
+	// Neither changes the last live camera.
+	LastCameraTracker t;
+	t.observeProgram(2, "cam3");
+	t.observeProgram(kSlotIntermission, "intermission");
+	t.observeProgram(kSlotAds, "ads");
+	CHECK_EQ(t.lastCameraSlot(), 2);
+}
+
 TEST(layout_small_and_degenerate)
 {
 	LayoutInput in;
@@ -712,6 +766,39 @@ TEST(config_roundtrip)
 	CHECK(!r.graphicsProgramOnly);
 	CHECK_EQ(r.lastLiveCameraUuid, std::string("uuid-s1"));
 	CHECK(!r.migratedFromV1);
+}
+
+TEST(config_intermission_and_ads_roundtrip)
+{
+	BankConfig c = makeDefaultConfig("b");
+	CHECK_EQ(c.intermission.sceneName, std::string("MF — INTERMISSION"));
+	CHECK_EQ(c.ads.sceneName, std::string("MF — VIDEO ADS"));
+	CHECK_EQ(c.playback(kSlotIntermission).label, std::string("Intermission"));
+	CHECK_EQ(c.playback(kSlotAds).label, std::string("Video Ads"));
+	c.intermission.graphicsUrl = "https://example.invalid/break?token=x";
+	c.intermission.graphicsUuid = "uuid-page";
+	c.ads.playlist = {"/ads/01 sponsor.mp4", "/ads/02 shop.mp4", "/ads/03 club.mp4"};
+	c.ads.filePath = c.ads.playlist.front();
+	obs_data_t *d = obs_data_create();
+	saveConfig(c, d);
+	obs_data_t *d2 = obs_data_create_from_json(obs_data_get_json(d));
+	BankConfig r = loadConfig(d2, "other");
+	obs_data_release(d2);
+	obs_data_release(d);
+	CHECK_EQ(r.intermission.graphicsUrl, c.intermission.graphicsUrl);
+	CHECK_EQ(r.intermission.graphicsUuid, std::string("uuid-page"));
+	CHECK_EQ(r.ads.playlist.size(), (size_t)3);
+	CHECK_EQ(r.ads.playlist[1], std::string("/ads/02 shop.mp4"));
+	CHECK_EQ(r.ads.filePath, std::string("/ads/01 sponsor.mp4"));
+	// A 1.2 configuration (no intermission / ads keys) loads with the defaults.
+	obs_data_t *old = obs_data_create();
+	obs_data_set_int(old, "version", 2);
+	obs_data_set_string(old, "bank_id", "old");
+	BankConfig o = loadConfig(old, "x");
+	obs_data_release(old);
+	CHECK(o.ads.playlist.empty());
+	CHECK_EQ(o.ads.sceneName, std::string("MF — VIDEO ADS"));
+	CHECK_EQ(o.intermission.label, std::string("Intermission"));
 }
 
 TEST(config_defaults_when_missing)

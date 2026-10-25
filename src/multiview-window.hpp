@@ -64,6 +64,7 @@ private:
 	void updatePlayback(int slot, PlaybackUi &ui);
 	void restoreGeometryPrefs();
 	void chooseFile(int slot);
+	void chooseAds();
 
 	Controller *controller_;
 	RenderSurface *surface_ = nullptr;
@@ -79,7 +80,7 @@ private:
 	QLabel *state_ = nullptr;
 	QLabel *message_ = nullptr;
 	QLabel *warning_ = nullptr;
-	PlaybackUi pb_[2];
+	PlaybackUi pb_[3]; // Replay, Highlights, Video Ads
 	QWidget *builtinPanels_ = nullptr;
 	QWidget *rcPanel_ = nullptr;
 	QLabel *rcStatus_ = nullptr;

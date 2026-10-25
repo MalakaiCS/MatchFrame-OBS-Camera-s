@@ -70,7 +70,7 @@ QString Controller::slotLabel(int slot) const
 {
 	if (slotIsCamera(slot))
 		return QString::fromStdString(cfg_.cameras[slot].label);
-	if (slotIsPlayback(slot))
+	if (slot >= kCameraCount && slot < kSlotCount)
 		return QString::fromStdString(cfg_.playback(slot).label);
 	return QString();
 }
@@ -79,7 +79,7 @@ void Controller::setSlotLabel(int slot, const QString &label)
 {
 	if (slotIsCamera(slot))
 		cfg_.cameras[slot].label = label.toStdString();
-	else if (slotIsPlayback(slot))
+	else if (slot >= kCameraCount && slot < kSlotCount)
 		cfg_.playback(slot).label = label.toStdString();
 	emit stateChanged();
 }
@@ -89,7 +89,7 @@ void Controller::setSlotLabel(int slot, const QString &label)
 
 bool Controller::selectSlot(int slot)
 {
-	if (replayCueMode() && slotIsPlayback(slot))
+	if (replayCueMode() && slotIsReplayCue(slot))
 		return rcSelect(slot);
 	std::string msg;
 	bool ok = switch_.selectPreview(slot, &msg);
@@ -175,6 +175,28 @@ bool Controller::loadPlayback(int slot, const QString &path)
 	return ok;
 }
 
+bool Controller::loadAdsPlaylist(const QStringList &files)
+{
+	std::vector<std::string> list;
+	for (const QString &f : files)
+		list.push_back(f.toStdString());
+	std::string msg;
+	bool ok = playback_.loadPlaylist(kSlotAds, list, &msg);
+	setMessage(QString("%1: %2").arg(slotLabel(kSlotAds), QString::fromStdString(msg)), !ok);
+	emit stateChanged();
+	return ok;
+}
+
+bool Controller::applyIntermissionUrl(const QString &url, QString *message)
+{
+	std::string msg;
+	bool ok = graphics_.setPlaybackOverlay(kSlotIntermission, true, url.trimmed().toStdString(), &msg);
+	if (message)
+		*message = msg.empty() ? QString("Intermission page applied") : QString::fromStdString(msg);
+	emit stateChanged();
+	return ok;
+}
+
 bool Controller::armPlayback(int slot)
 {
 	std::string msg;
@@ -254,7 +276,9 @@ void Controller::applyCleanFeed()
 	// The filter is a no-op when the option is off, so it stays on the sources either way.
 	OBSSourceAutoRelease cam = bank_.cameraGraphics();
 	ensureCleanFeedFilter(cam);
-	for (int slot : {kSlotReplay, kSlotHighlights}) {
+	// Playback overlays only: the Intermission page is that scene's content, so its tile
+	// shows it.
+	for (int slot : {kSlotReplay, kSlotHighlights, kSlotAds}) {
 		OBSSourceAutoRelease pg = bank_.playbackGraphics(slot);
 		ensureCleanFeedFilter(pg);
 	}
@@ -639,23 +663,29 @@ void Controller::shutdown()
 // hotkeys (frontend actions, unbound by default; bindings stored in the module config)
 
 namespace {
+constexpr int kActionCut = 100;
+constexpr int kActionReturnLive = 101;
+
 struct HotkeyDef {
 	const char *name;
 	const char *description;
+	int action; // bank slot to preview, or kActionCut / kActionReturnLive
 };
-const HotkeyDef kHotkeys[12] = {
-	{"MatchFrame.PreviewCam1", "MatchFrame: Preview Camera 1"},
-	{"MatchFrame.PreviewCam2", "MatchFrame: Preview Camera 2"},
-	{"MatchFrame.PreviewCam3", "MatchFrame: Preview Camera 3"},
-	{"MatchFrame.PreviewCam4", "MatchFrame: Preview Camera 4"},
-	{"MatchFrame.PreviewCam5", "MatchFrame: Preview Camera 5"},
-	{"MatchFrame.PreviewCam6", "MatchFrame: Preview Camera 6"},
-	{"MatchFrame.PreviewCam7", "MatchFrame: Preview Camera 7"},
-	{"MatchFrame.PreviewCam8", "MatchFrame: Preview Camera 8"},
-	{"MatchFrame.PreviewReplay", "MatchFrame: Preview Replay"},
-	{"MatchFrame.PreviewHighlights", "MatchFrame: Preview Highlights"},
-	{"MatchFrame.Cut", "MatchFrame: CUT (Preview → Program)"},
-	{"MatchFrame.ReturnLive", "MatchFrame: Return Live (cut to last camera)"},
+const HotkeyDef kHotkeys[kHotkeyCount] = {
+	{"MatchFrame.PreviewCam1", "MatchFrame: Preview Camera 1", 0},
+	{"MatchFrame.PreviewCam2", "MatchFrame: Preview Camera 2", 1},
+	{"MatchFrame.PreviewCam3", "MatchFrame: Preview Camera 3", 2},
+	{"MatchFrame.PreviewCam4", "MatchFrame: Preview Camera 4", 3},
+	{"MatchFrame.PreviewCam5", "MatchFrame: Preview Camera 5", 4},
+	{"MatchFrame.PreviewCam6", "MatchFrame: Preview Camera 6", 5},
+	{"MatchFrame.PreviewCam7", "MatchFrame: Preview Camera 7", 6},
+	{"MatchFrame.PreviewCam8", "MatchFrame: Preview Camera 8", 7},
+	{"MatchFrame.PreviewReplay", "MatchFrame: Preview Replay", kSlotReplay},
+	{"MatchFrame.PreviewHighlights", "MatchFrame: Preview Highlights", kSlotHighlights},
+	{"MatchFrame.Cut", "MatchFrame: CUT (Preview → Program)", kActionCut},
+	{"MatchFrame.ReturnLive", "MatchFrame: Return Live (cut to last camera)", kActionReturnLive},
+	{"MatchFrame.PreviewIntermission", "MatchFrame: Preview Intermission", kSlotIntermission},
+	{"MatchFrame.PreviewAds", "MatchFrame: Preview Video Ads", kSlotAds},
 };
 
 void hotkeyCallback(void *data, obs_hotkey_id, obs_hotkey_t *, bool pressed)
@@ -673,12 +703,12 @@ void hotkeyCallback(void *data, obs_hotkey_id, obs_hotkey_t *, bool pressed)
 			Controller *ctl = Controller::instance();
 			if (!ctl || !ctl->collectionReady())
 				return;
-			if (action < 10)
-				ctl->selectSlot(action);
-			else if (action == 10)
+			if (action == kActionCut)
 				ctl->cut();
-			else
+			else if (action == kActionReturnLive)
 				ctl->returnLive();
+			else
+				ctl->selectSlot(action);
 		},
 		Qt::QueuedConnection);
 }
@@ -694,11 +724,11 @@ std::string hotkeyFile()
 
 void Controller::registerHotkeys()
 {
-	for (int i = 0; i < 12; i++) {
+	for (int i = 0; i < kHotkeyCount; i++) {
 		if (hotkeys_[i] != OBS_INVALID_HOTKEY_ID)
 			continue;
 		hotkeys_[i] = obs_hotkey_register_frontend(kHotkeys[i].name, kHotkeys[i].description, hotkeyCallback,
-							   (void *)(intptr_t)i);
+							   (void *)(intptr_t)kHotkeys[i].action);
 	}
 	loadHotkeys();
 }
@@ -718,7 +748,7 @@ void Controller::loadHotkeys()
 	OBSDataAutoRelease data = obs_data_create_from_json_file_safe(path.c_str(), "bak");
 	if (!data)
 		return;
-	for (int i = 0; i < 12; i++) {
+	for (int i = 0; i < kHotkeyCount; i++) {
 		OBSDataArrayAutoRelease arr = obs_data_get_array(data, kHotkeys[i].name);
 		if (arr && hotkeys_[i] != OBS_INVALID_HOTKEY_ID)
 			obs_hotkey_load(hotkeys_[i], arr);
@@ -736,7 +766,7 @@ void Controller::saveHotkeys()
 		bfree(dir);
 	}
 	OBSDataAutoRelease data = obs_data_create();
-	for (int i = 0; i < 12; i++) {
+	for (int i = 0; i < kHotkeyCount; i++) {
 		if (hotkeys_[i] == OBS_INVALID_HOTKEY_ID)
 			continue;
 		OBSDataArrayAutoRelease arr = obs_hotkey_save(hotkeys_[i]);

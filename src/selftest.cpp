@@ -401,7 +401,7 @@ private:
 	std::string structureFingerprint()
 	{
 		std::string fp;
-		for (int i = 0; i < 10; i++) {
+		for (int i = 0; i < kSlotCount; i++) {
 			OBSSourceAutoRelease s = ctl()->bank().slotScene(i);
 			fp += uuidOf(s) + "[";
 			for (auto *item : sceneItems(obs_scene_from_source(s)))
@@ -539,17 +539,18 @@ private:
 			connectMediaCounters();
 		});
 
-		add("C01 ten production scenes", [this]() {
+		add("C01 twelve production scenes", [this]() {
 			int owned = countOwnedScenes();
 			bool names = true;
 			QString list;
-			for (int i = 0; i < 10; i++) {
+			for (int i = 0; i < kSlotCount; i++) {
 				OBSSourceAutoRelease s = ctl()->bank().slotScene(i);
 				names = names && s;
 				list += QString::fromStdString(nameOf(s)) + "; ";
 			}
-			check("C01", "Exactly ten plugin-owned scenes (8 cameras + Replay + Highlights)",
-			      owned == 10 && names, QString("owned=%1: %2").arg(owned).arg(list));
+			check("C01",
+			      "Exactly twelve plugin-owned scenes (8 cameras, Replay, Highlights, Intermission, Video Ads)",
+			      owned == kSlotCount && names, QString("owned=%1: %2").arg(owned).arg(list));
 			OBSSourceAutoRelease s5 = ctl()->bank().slotScene(4);
 			bool collisionHandled = nameOf(s5) == "MF — CAM 05 (2)";
 			bool warned = false;
@@ -585,9 +586,36 @@ private:
 			      ok, detail);
 			check("C02",
 			      "One graphics source instance shared by all eight camera scenes; no graphics helper scene",
-			      g && graphicsOutsideCameraScenes(g) == 0 && countOwnedScenes() == 10,
+			      g && graphicsOutsideCameraScenes(g) == 0 && countOwnedScenes() == kSlotCount,
 			      QString("graphics source '%1' (%2)")
 				      .arg(QString::fromStdString(nameOf(g)), graphicsSourceTypeId()));
+
+			{
+				// Intermission: only its own page; Video Ads: its own media source. Neither
+				// carries the camera graphics.
+				OBSSourceAutoRelease is = ctl()->bank().slotScene(kSlotIntermission);
+				OBSSourceAutoRelease page = ctl()->bank().playbackGraphics(kSlotIntermission);
+				auto iItems = sceneItems(obs_scene_from_source(is));
+				OBSSourceAutoRelease as = ctl()->bank().slotScene(kSlotAds);
+				OBSSourceAutoRelease am = media(kSlotAds);
+				auto aItems = sceneItems(obs_scene_from_source(as));
+				OBSDataAutoRelease ast = obs_source_get_settings(am);
+				bool ok2 = is && page && iItems.size() == 1 &&
+					   obs_sceneitem_get_source(iItems[0]) == page.Get() && page.Get() != g.Get() &&
+					   !hasCleanFeedFilter(page) && as && am && aItems.size() == 1 &&
+					   obs_sceneitem_get_source(aItems[0]) == am.Get() &&
+					   !obs_data_get_bool(ast, "looping") &&
+					   !obs_data_get_bool(ast, "restart_on_activate");
+				check("C42a",
+				      "Intermission scene holds only its own page (shown in its tile); Video Ads holds its "
+				      "own media source; no camera graphics in either",
+				      ok2,
+				      QString("intermission items=%1 '%2'; ads items=%3 '%4'")
+					      .arg(iItems.size())
+					      .arg(QString::fromStdString(nameOf(page)))
+					      .arg(aItems.size())
+					      .arg(QString::fromStdString(nameOf(am))));
+			}
 
 			bool pbOk = true;
 			for (int slot : {kSlotReplay, kSlotHighlights}) {
@@ -665,7 +693,7 @@ private:
 			obs_sceneitem_get_pos(c2, &p2);
 			check("C06", "Re-running Create / Repair creates no duplicates and preserves manual transforms",
 			      before == after && fp1 == fp3 && b.created == 0 && c.created == 0 &&
-				      countOwnedScenes() == 10 && preserved,
+				      countOwnedScenes() == kSlotCount && preserved,
 			      QString("sources %1->%2, created on reruns %3/%4/%5, transform kept=%6")
 				      .arg(before)
 				      .arg(after)
@@ -707,7 +735,7 @@ private:
 			obs_data_set_string(priv, "transition", "Fade");
 			ctl()->createOrRepair();
 			OBSDataAutoRelease priv2 = obs_source_get_private_settings(s4);
-			check("C11b", "Create / Repair clears transition overrides on the ten owned scenes",
+			check("C11b", "Create / Repair clears transition overrides on the owned scenes",
 			      strlen(obs_data_get_string(priv2, "transition")) == 0);
 		});
 		add("assign camera 8", [this, cams]() {
@@ -1192,6 +1220,96 @@ private:
 			      programIs(2) && strcmp(obs_source_get_unversioned_id(tr), "cut_transition") == 0);
 		});
 
+		// ---- Intermission (key "-") and Video Ads (key "=")
+		add("C42 intermission to Preview", [this]() {
+			ctl()->applyIntermissionUrl("http://127.0.0.1:9/intermission.html", nullptr);
+			imProgramBefore_ = programUuid();
+			sendKey(Qt::Key_Minus, false, "-");
+			imPreviewOk_ = previewUuid() == sceneUuid(kSlotIntermission) &&
+				       programUuid() == imProgramBefore_;
+		});
+		add(
+			"C42 take intermission", [this]() { ctl()->cut(); },
+			[this]() { return programIs(kSlotIntermission) && !ctl()->switcher().takeState().busy(); },
+			4000);
+		add("C42 verify", [this, expectedLastCam]() {
+			SwitchView sv = ctl()->switcher().view();
+			check("C42",
+			      "Key - puts Intermission in Preview only; CUT takes it; last live camera is kept for "
+			      "Return Live",
+			      imPreviewOk_ && programIs(kSlotIntermission) && sv.lastCameraSlot == *expectedLastCam &&
+				      sv.returnLiveEnabled,
+			      QString("preview ok=%1, last camera %2 expected %3")
+				      .arg(imPreviewOk_)
+				      .arg(sv.lastCameraSlot)
+				      .arg(*expectedLastCam));
+		});
+		add(
+			"C42 return live", [this]() { ctl()->returnLive(); },
+			[this, expectedLastCam]() { return programIs(*expectedLastCam); }, 4000);
+		add(
+			"C43 load ads",
+			[this]() {
+				adsLoadOk_ = ctl()->loadAdsPlaylist({mediaPath("cam4.mp4"), mediaPath("cam5.mp4")});
+			},
+			[this]() { return pbState(kSlotAds) == PlaybackState::Ready; }, 12000);
+		add("C43 verify arm", [this]() {
+			OBSSourceAutoRelease m = media(kSlotAds);
+			PlaybackView v = ctl()->playback().view(kSlotAds);
+			check("C43", "A two-ad playlist arms paused at the first frame of ad 1 (READY), off-air",
+			      adsLoadOk_ && v.playlistCount == 2 && v.playlistIndex == 0 &&
+				      v.fileName.find("cam4") != std::string::npos && mediaTime(kSlotAds) < 200 &&
+				      !obs_source_active(m),
+			      QString("count=%1 index=%2 file=%3 t=%4")
+				      .arg(v.playlistCount)
+				      .arg(v.playlistIndex)
+				      .arg(QString::fromStdString(v.fileName))
+				      .arg(mediaTime(kSlotAds)));
+		});
+		add(
+			"C44 take ads",
+			[this]() {
+				sendKey(Qt::Key_Equal, false, "=");
+				ctl()->cut();
+			},
+			[this]() {
+				return programIs(kSlotAds) && pbState(kSlotAds) == PlaybackState::Playing &&
+				       !ctl()->switcher().takeState().busy();
+			},
+			4000);
+		waitFor(
+			"C44 second ad playing",
+			[this]() {
+				PlaybackView v = ctl()->playback().view(kSlotAds);
+				return v.playlistIndex == 1 && v.state == PlaybackState::Playing &&
+				       v.fileName.find("cam5") != std::string::npos;
+			},
+			14000);
+		add("C44 verify", [this]() {
+			check("C44", "On Program the ads play in order: ad 2 follows ad 1 automatically, still on air",
+			      programIs(kSlotAds) && ctl()->playback().view(kSlotAds).playlistIndex == 1);
+		});
+		waitFor("ads ended", [this]() { return pbState(kSlotAds) == PlaybackState::Ended; }, 14000);
+		sleep(1000);
+		add("C45 verify end", [this]() {
+			check("C45", "After the last ad: ENDED, no loop and no automatic scene change",
+			      pbState(kSlotAds) == PlaybackState::Ended && programIs(kSlotAds));
+		});
+		add(
+			"C46 return live", [this]() { ctl()->returnLive(); },
+			[this, expectedLastCam]() { return programIs(*expectedLastCam); }, 4000);
+		waitFor("ads re-armed", [this]() { return pbState(kSlotAds) == PlaybackState::Ready; }, 10000);
+		add("C46 verify", [this, expectedLastCam]() {
+			PlaybackView v = ctl()->playback().view(kSlotAds);
+			check("C46", "Return Live after the ads: back on the last camera; the playlist re-arms at ad 1",
+			      programIs(*expectedLastCam) && v.playlistIndex == 0 &&
+				      v.fileName.find("cam4") != std::string::npos && mediaTime(kSlotAds) < 200,
+			      QString("index=%1 file=%2 t=%3")
+				      .arg(v.playlistIndex)
+				      .arg(QString::fromStdString(v.fileName))
+				      .arg(mediaTime(kSlotAds)));
+		});
+
 		// ---- Failure handling
 		add(
 			"C31 missing media",
@@ -1305,7 +1423,7 @@ private:
 			QApplication::processEvents();
 			w->surface()->purgeGraveyard();
 			int showing = 0;
-			for (int i = 0; i < 10; i++) {
+			for (int i = 0; i < kSlotCount; i++) {
 				if (sceneUuid(i) == previewUuid() || sceneUuid(i) == programUuid())
 					continue;
 				OBSSourceAutoRelease s = ctl()->bank().slotScene(i);
@@ -1348,7 +1466,7 @@ private:
 			check("C33b",
 			      "Repair recreates the deleted scene with a new identity; Return Live still refuses the "
 			      "old identity",
-			      recreated && r.created > 0 && !sv.returnLiveEnabled && countOwnedScenes() == 10,
+			      recreated && r.created > 0 && !sv.returnLiveEnabled && countOwnedScenes() == kSlotCount,
 			      QString::fromStdString(sv.returnLiveReason));
 			check("C34", "Create / Repair never switches Program", programIs(kSlotReplay));
 		});
@@ -1621,8 +1739,8 @@ private:
 				inputs = inputs && in && uuidOf(in) == c.cameras[i].inputUuid;
 			}
 			OBSSourceAutoRelease s3 = ctl()->bank().slotScene(2);
-			check("P01", "After restart: ten owned scenes and all camera assignments resolve by UUID",
-			      owned == 10 && inputs, QString("owned=%1").arg(owned));
+			check("P01", "After restart: twelve owned scenes and all camera assignments resolve by UUID",
+			      owned == kSlotCount && inputs, QString("owned=%1").arg(owned));
 			check("P02", "After restart: renamed scene keeps its slot", nameOf(s3) == "Renamed Left Goal");
 			check("P03", "After restart: labels, graphics URL and playback files restored",
 			      c.cameras[0].label == "Main Wide" && !c.graphicsUrl.empty() &&
@@ -1631,19 +1749,26 @@ private:
 			check("P04", "After restart: last live camera identity restored", sv.lastCameraSlot >= 0,
 			      QString("slot %1").arg(sv.lastCameraSlot));
 			bankScene0_ = sceneUuid(0);
+			check("P09", "After restart: Intermission page URL and the Video Ads playlist are restored",
+			      !c.intermission.graphicsUrl.empty() && c.ads.playlist.size() == 2 &&
+				      ctl()->bank().slotScene(kSlotIntermission) && ctl()->bank().slotScene(kSlotAds),
+			      QString("ads=%1").arg(c.ads.playlist.size()));
 		});
 		waitFor(
 			"P05 playback re-armed after restart",
 			[this]() {
 				return pbState(kSlotReplay) == PlaybackState::Ready &&
-				       pbState(kSlotHighlights) == PlaybackState::Ready;
+				       pbState(kSlotHighlights) == PlaybackState::Ready &&
+				       pbState(kSlotAds) == PlaybackState::Ready;
 			},
 			15000);
 		add("P05 verify", [this]() {
 			check("P05",
-			      "After restart: saved replay / highlights files are re-armed paused at the first frame",
+			      "After restart: saved replay / highlights files and the first ad are re-armed paused at "
+			      "the first frame",
 			      pbState(kSlotReplay) == PlaybackState::Ready && mediaTime(kSlotReplay) < 200 &&
-				      pbState(kSlotHighlights) == PlaybackState::Ready);
+				      pbState(kSlotHighlights) == PlaybackState::Ready &&
+				      pbState(kSlotAds) == PlaybackState::Ready && mediaTime(kSlotAds) < 200);
 			ctl()->showMultiview();
 		});
 		add(
@@ -1673,7 +1798,7 @@ private:
 		add("P07 verify", [this]() {
 			bool sel = ctl()->selectSlot(1);
 			check("P07", "Switching back restores the original bank and switching works",
-			      countOwnedScenes() == 10 && sceneUuid(0) == bankScene0_ && sel &&
+			      countOwnedScenes() == kSlotCount && sceneUuid(0) == bankScene0_ && sel &&
 				      previewUuid() == sceneUuid(1));
 		});
 		waitFor(
@@ -1698,6 +1823,8 @@ private:
 	QString recordingPath_;
 	std::vector<OBSSourceAutoRelease> parked_;
 	std::vector<std::string> repairLines_;
+	std::string imProgramBefore_;
+	bool imPreviewOk_ = false, adsLoadOk_ = false;
 	int startCount_ = 0;
 	int64_t cutStart_ = 0;
 	int sceneChangedBefore_ = 0, programChanges_ = 0, repeatAccepted_ = 0, repeatDropped_ = 0;

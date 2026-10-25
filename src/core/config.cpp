@@ -27,12 +27,30 @@ const char *defaultCameraLabel(int cam)
 
 const char *defaultPlaybackSceneName(int slot)
 {
-	return slot == 8 ? "MF — REPLAY" : "MF — HIGHLIGHTS";
+	switch (slot) {
+	case 8:
+		return "MF — REPLAY";
+	case 10:
+		return "MF — INTERMISSION";
+	case 11:
+		return "MF — VIDEO ADS";
+	default:
+		return "MF — HIGHLIGHTS";
+	}
 }
 
 const char *defaultPlaybackLabel(int slot)
 {
-	return slot == 8 ? "Replay" : "Half-Time / Full-Time Highlights";
+	switch (slot) {
+	case 8:
+		return "Replay";
+	case 10:
+		return "Intermission";
+	case 11:
+		return "Video Ads";
+	default:
+		return "Half-Time / Full-Time Highlights";
+	}
 }
 
 std::string randomId()
@@ -58,6 +76,10 @@ BankConfig makeDefaultConfig(const std::string &bankId)
 	c.replay.sceneName = defaultPlaybackSceneName(8);
 	c.highlights.label = defaultPlaybackLabel(9);
 	c.highlights.sceneName = defaultPlaybackSceneName(9);
+	c.intermission.label = defaultPlaybackLabel(10);
+	c.intermission.sceneName = defaultPlaybackSceneName(10);
+	c.ads.label = defaultPlaybackLabel(11);
+	c.ads.sceneName = defaultPlaybackSceneName(11);
 	return c;
 }
 
@@ -79,6 +101,17 @@ static void savePlayback(const PlaybackSlotConfig &p, obs_data_t *d)
 	obs_data_set_bool(d, "graphics_enabled", p.graphicsEnabled);
 	obs_data_set_string(d, "graphics_uuid", p.graphicsUuid.c_str());
 	obs_data_set_int(d, "graphics_item_id", p.graphicsItemId);
+	if (!p.playlist.empty()) {
+		obs_data_array_t *list = obs_data_array_create();
+		for (const auto &f : p.playlist) {
+			obs_data_t *e = obs_data_create();
+			obs_data_set_string(e, "file", f.c_str());
+			obs_data_array_push_back(list, e);
+			obs_data_release(e);
+		}
+		obs_data_set_array(d, "playlist", list);
+		obs_data_array_release(list);
+	}
 }
 
 static void loadPlayback(PlaybackSlotConfig &p, obs_data_t *d)
@@ -97,6 +130,16 @@ static void loadPlayback(PlaybackSlotConfig &p, obs_data_t *d)
 	p.graphicsEnabled = obs_data_get_bool(d, "graphics_enabled");
 	p.graphicsUuid = str(d, "graphics_uuid");
 	p.graphicsItemId = obs_data_get_int(d, "graphics_item_id");
+	p.playlist.clear();
+	obs_data_array_t *list = obs_data_get_array(d, "playlist");
+	for (size_t i = 0, n = list ? obs_data_array_count(list) : 0; i < n; i++) {
+		obs_data_t *e = obs_data_array_item(list, i);
+		std::string f = str(e, "file");
+		if (!f.empty())
+			p.playlist.push_back(f);
+		obs_data_release(e);
+	}
+	obs_data_array_release(list);
 }
 
 void saveConfig(const BankConfig &cfg, obs_data_t *data)
@@ -138,6 +181,16 @@ void saveConfig(const BankConfig &cfg, obs_data_t *data)
 	savePlayback(cfg.highlights, h);
 	obs_data_set_obj(data, "highlights", h);
 	obs_data_release(h);
+
+	obs_data_t *im = obs_data_create();
+	savePlayback(cfg.intermission, im);
+	obs_data_set_obj(data, "intermission", im);
+	obs_data_release(im);
+
+	obs_data_t *ad = obs_data_create();
+	savePlayback(cfg.ads, ad);
+	obs_data_set_obj(data, "ads", ad);
+	obs_data_release(ad);
 }
 
 // Schema v1 (spike builds) stored names only:
@@ -220,6 +273,12 @@ BankConfig loadConfig(obs_data_t *data, const std::string &fallbackBankId)
 	obs_data_t *h = obs_data_get_obj(data, "highlights");
 	loadPlayback(c.highlights, h);
 	obs_data_release(h);
+	obs_data_t *im = obs_data_get_obj(data, "intermission"); // added in 1.3.0
+	loadPlayback(c.intermission, im);
+	obs_data_release(im);
+	obs_data_t *ad = obs_data_get_obj(data, "ads");
+	loadPlayback(c.ads, ad);
+	obs_data_release(ad);
 	return c;
 }
 

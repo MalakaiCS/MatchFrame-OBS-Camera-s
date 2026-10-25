@@ -22,6 +22,7 @@
 #include <QTextEdit>
 #include <QVBoxLayout>
 
+#include <algorithm>
 #include <functional>
 
 namespace mf {
@@ -108,12 +109,19 @@ void MultiviewWindow::buildUi()
 	surface_ = new RenderSurface(this);
 	root->addWidget(surface_, 1);
 
-	builtinPanels_ = new QWidget(this);
+	// Replay / Highlights panels (hidden while Replay Cue provides them) and the Video Ads
+	// panel, which is always the plugin's own.
+	auto *panels = new QWidget(this);
+	auto *panelRow = new QHBoxLayout(panels);
+	panelRow->setContentsMargins(0, 0, 0, 0);
+	builtinPanels_ = new QWidget(panels);
 	auto *pbRow = new QHBoxLayout(builtinPanels_);
 	pbRow->setContentsMargins(0, 0, 0, 0);
 	pbRow->addWidget(buildPlaybackPanel(kSlotReplay, pb_[0]), 1);
 	pbRow->addWidget(buildPlaybackPanel(kSlotHighlights, pb_[1]), 1);
-	root->addWidget(builtinPanels_);
+	panelRow->addWidget(builtinPanels_, 2);
+	panelRow->addWidget(buildPlaybackPanel(kSlotAds, pb_[2]), 1);
+	root->addWidget(panels);
 	rcPanel_ = buildReplayCuePanel();
 	rcPanel_->hide();
 	root->addWidget(rcPanel_);
@@ -141,14 +149,17 @@ QWidget *MultiviewWindow::buildPlaybackPanel(int slot, PlaybackUi &ui)
 	auto *l = new QGridLayout(box);
 	l->setContentsMargins(6, 4, 6, 4);
 	l->setVerticalSpacing(3);
-	ui.title = new QLabel(slot == kSlotReplay ? "<b>REPLAY</b> [9]" : "<b>HIGHLIGHTS</b> [0]", box);
+	ui.title = new QLabel(slot == kSlotReplay ? "<b>REPLAY</b> [9]"
+			      : slot == kSlotAds  ? "<b>VIDEO ADS</b> [=]"
+						  : "<b>HIGHLIGHTS</b> [0]",
+			      box);
 	ui.file = new QLabel(box);
 	ui.file->setMinimumWidth(120);
 	ui.status = new QLabel(box);
 	ui.status->setMinimumWidth(80);
 	ui.time = new QLabel(box);
 	ui.time->setMinimumWidth(90);
-	ui.load = makeButton("Load / Arm…", box);
+	ui.load = makeButton(slot == kSlotAds ? "Load Ads…" : "Load / Arm…", box);
 	ui.arm = makeButton("Arm", box);
 	ui.arm->setToolTip("Re-arm the loaded file at its first frame (off-air only)");
 	ui.play = makeButton("Play", box);
@@ -166,7 +177,12 @@ QWidget *MultiviewWindow::buildPlaybackPanel(int slot, PlaybackUi &ui)
 	ui.file->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
 	ui.play->setMinimumWidth(110);
 	ui.restart->setMinimumWidth(110);
-	connect(ui.load, &QPushButton::clicked, this, [this, slot]() { chooseFile(slot); });
+	connect(ui.load, &QPushButton::clicked, this, [this, slot]() {
+		if (slot == kSlotAds)
+			chooseAds();
+		else
+			chooseFile(slot);
+	});
 	connect(ui.arm, &QPushButton::clicked, this, [this, slot]() { controller_->armPlayback(slot); });
 	connect(ui.play, &QPushButton::clicked, this, [this, slot]() { controller_->playPausePlayback(slot); });
 	connect(ui.restart, &QPushButton::clicked, this, [this, slot]() { controller_->restartPlayback(slot); });
@@ -321,6 +337,26 @@ void MultiviewWindow::chooseFile(int slot)
 		controller_->loadPlayback(slot, path);
 }
 
+void MultiviewWindow::chooseAds()
+{
+	PlaybackView v = controller_->playback().view(kSlotAds);
+	if (!v.canModify) {
+		controller_->setMessage(QString::fromStdString(v.modifyBlockReason), true);
+		return;
+	}
+	QString start = v.file.empty() ? QString() : QFileInfo(QString::fromStdString(v.file)).absolutePath();
+	QStringList files = QFileDialog::getOpenFileNames(
+		this, "Load video ads (they play in file-name order)", start,
+		"Media files (*.mp4 *.mov *.mkv *.m4v *.ts *.webm *.avi *.mxf *.flv);;All files (*)");
+	if (files.isEmpty())
+		return;
+	// Play order = file-name order, so "01 Sponsor.mp4", "02 Club shop.mp4"… is predictable.
+	std::sort(files.begin(), files.end(), [](const QString &a, const QString &b) {
+		return QString::localeAwareCompare(QFileInfo(a).fileName(), QFileInfo(b).fileName()) < 0;
+	});
+	controller_->loadAdsPlaylist(files);
+}
+
 void MultiviewWindow::showAndRaise()
 {
 	show();
@@ -369,6 +405,10 @@ void MultiviewWindow::keyPressEvent(QKeyEvent *event)
 		controller_->selectSlot(kSlotReplay);
 	} else if (k == Qt::Key_0) {
 		controller_->selectSlot(kSlotHighlights);
+	} else if (k == Qt::Key_Minus) {
+		controller_->selectSlot(kSlotIntermission);
+	} else if (k == Qt::Key_Equal || k == Qt::Key_Plus) {
+		controller_->selectSlot(kSlotAds);
 	} else if (k == Qt::Key_Space) {
 		controller_->cut();
 	} else if (k == Qt::Key_Escape) {
@@ -432,15 +472,21 @@ void MultiviewWindow::onPaneClicked(int pane)
 		controller_->selectSlot(kSlotReplay);
 	else if (pane == kPaneHighlights)
 		controller_->selectSlot(kSlotHighlights);
+	else if (pane == kPaneIntermission)
+		controller_->selectSlot(kSlotIntermission);
+	else if (pane == kPaneAds)
+		controller_->selectSlot(kSlotAds);
 	setFocus();
 }
 
 void MultiviewWindow::onPaneDoubleClicked(int pane)
 {
-	int slot = paneIsCamera(pane)        ? pane - kPaneCam1
-		   : pane == kPaneReplay     ? kSlotReplay
-		   : pane == kPaneHighlights ? kSlotHighlights
-					     : -1;
+	int slot = paneIsCamera(pane)          ? pane - kPaneCam1
+		   : pane == kPaneReplay       ? kSlotReplay
+		   : pane == kPaneHighlights   ? kSlotHighlights
+		   : pane == kPaneIntermission ? kSlotIntermission
+		   : pane == kPaneAds          ? kSlotAds
+					       : -1;
 	if (slot < 0)
 		return;
 	bool ok = false;
@@ -476,6 +522,7 @@ void MultiviewWindow::refresh()
 		updatePlayback(kSlotReplay, pb_[0]);
 		updatePlayback(kSlotHighlights, pb_[1]);
 	}
+	updatePlayback(kSlotAds, pb_[2]);
 	updatePanes();
 	surface_->purgeGraveyard();
 }
@@ -507,7 +554,7 @@ void MultiviewWindow::updateToolbar()
 	returnLive_->setEnabled(sv.returnLiveEnabled);
 	returnLive_->setToolTip(sv.returnLiveEnabled ? "Immediate on-air cut to the last camera that was on Program"
 						     : QString::fromStdString(sv.returnLiveReason));
-	returnLive_->setStyleSheet(sv.returnLiveEnabled && slotIsPlayback(sv.programSlot)
+	returnLive_->setStyleSheet(sv.returnLiveEnabled && sv.programSlot >= kCameraCount
 					   ? "QPushButton{background:#7a4a00;color:white;font-weight:bold;}"
 					   : "");
 
@@ -583,7 +630,10 @@ void MultiviewWindow::updatePlayback(int slot, PlaybackUi &ui)
 		return;
 	}
 	PlaybackView v = controller_->playback().view(slot);
-	ui.file->setText(v.fileName.empty() ? "<i>no file</i>" : QString::fromStdString(v.fileName).toHtmlEscaped());
+	QString fileText = v.fileName.empty() ? "<i>no file</i>" : QString::fromStdString(v.fileName).toHtmlEscaped();
+	if (v.playlistCount > 0)
+		fileText = QString("Ad %1/%2 · %3").arg(v.playlistIndex + 1).arg(v.playlistCount).arg(fileText);
+	ui.file->setText(fileText);
 	ui.file->setToolTip(QString::fromStdString(v.file));
 	QString st = playbackStateName(v.state);
 	if (v.onProgram)
@@ -599,8 +649,10 @@ void MultiviewWindow::updatePlayback(int slot, PlaybackUi &ui)
 
 	const bool loaded = !v.file.empty() && v.state != PlaybackState::Empty && v.state != PlaybackState::Error;
 	ui.load->setEnabled(v.sourceExists && v.canModify);
-	ui.load->setToolTip(v.canModify ? "Choose a prepared file and arm it at its first frame (off-air)"
-					: QString::fromStdString(v.modifyBlockReason));
+	ui.load->setToolTip(!v.canModify       ? QString::fromStdString(v.modifyBlockReason)
+			    : slot == kSlotAds ? "Choose one or more ad files (played in file-name order) and arm the "
+						 "first one (off-air)"
+					       : "Choose a prepared file and arm it at its first frame (off-air)");
 	ui.arm->setEnabled(v.sourceExists && v.canModify && !v.file.empty() && v.state != PlaybackState::Ready &&
 			   v.state != PlaybackState::Loading);
 
@@ -678,17 +730,19 @@ void MultiviewWindow::updatePanes()
 		}
 	}
 
-	for (int slot : {kSlotReplay, kSlotHighlights}) {
-		if (c->replayCueMode())
-			break;
-		PaneSpec &p = panes[slot == kSlotReplay ? kPaneReplay : kPaneHighlights];
+	for (int slot : {kSlotReplay, kSlotHighlights, kSlotAds}) {
+		if (c->replayCueMode() && slotIsReplayCue(slot))
+			continue;
+		PaneSpec &p = panes[slot == kSlotReplay ? kPaneReplay : slot == kSlotAds ? kPaneAds : kPaneHighlights];
 		PlaybackView v = c->playback().view(slot);
 		p.source = bank.slotScene(slot);
-		p.title = QString("%1 · %2").arg(slot == kSlotReplay ? "REPLAY" : "HIGHLIGHTS",
-						 QString::fromStdString(c->config().playback(slot).label));
+		const char *kind = slot == kSlotReplay ? "REPLAY" : slot == kSlotAds ? "VIDEO ADS" : "HIGHLIGHTS";
+		p.title = QString("%1 · %2").arg(kind, QString::fromStdString(c->config().playback(slot).label));
 		p.preview = sv.previewSlot == slot;
 		p.live = sv.programSlot == slot;
 		QString status = playbackStateName(v.state);
+		if (v.playlistCount > 0)
+			status += QString("  AD %1/%2").arg(v.playlistIndex + 1).arg(v.playlistCount);
 		if (!v.fileName.empty())
 			status += "  " + QString::fromStdString(v.fileName);
 		if (v.durationMs > 0)
@@ -709,6 +763,27 @@ void MultiviewWindow::updatePanes()
 			p.statusColor = 0xFFB0BEC5;
 		}
 		p.dimmed = !p.source || v.state == PlaybackState::Empty || v.state == PlaybackState::Error;
+	}
+
+	{
+		// Intermission: a graphics page, always ready once its scene exists.
+		PaneSpec &p = panes[kPaneIntermission];
+		const PlaybackSlotConfig &im = c->config().intermission;
+		p.source = bank.slotScene(kSlotIntermission);
+		p.title = QString("INTERMISSION · %1").arg(QString::fromStdString(im.label));
+		p.preview = sv.previewSlot == kSlotIntermission;
+		p.live = sv.programSlot == kSlotIntermission;
+		if (!p.source) {
+			p.status = "NOT CREATED – run Create / Repair";
+			p.statusColor = 0xFFFF7043;
+		} else if (im.graphicsUrl.empty()) {
+			p.status = "NO PAGE – set the Intermission URL in Setup";
+			p.statusColor = 0xFFFFD54F;
+		} else {
+			p.status = p.live ? "ON AIR" : "READY";
+			p.statusColor = p.live ? 0xFFFF8A80 : 0xFF81C784;
+		}
+		p.dimmed = !p.source;
 	}
 
 	if (c->replayCueMode())

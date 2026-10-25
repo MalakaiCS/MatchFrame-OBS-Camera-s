@@ -8,6 +8,7 @@
 #include <array>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 struct obs_data;
 typedef struct obs_data obs_data_t;
@@ -41,6 +42,8 @@ struct PlaybackSlotConfig {
 	bool graphicsEnabled = false;
 	std::string graphicsUuid;
 	int64_t graphicsItemId = 0;
+	// Video Ads only: the ads in play order. filePath is the first one (what is armed).
+	std::vector<std::string> playlist;
 };
 
 struct BankConfig {
@@ -49,6 +52,9 @@ struct BankConfig {
 	std::array<CameraSlotConfig, 8> cameras;
 	PlaybackSlotConfig replay;
 	PlaybackSlotConfig highlights;
+	// Intermission: a graphics page (graphicsUrl / graphicsUuid / graphicsItemId), no media.
+	PlaybackSlotConfig intermission;
+	PlaybackSlotConfig ads;   // Video Ads: media playlist (+ optional overlay)
 	std::string graphicsUrl;  // shared camera graphics output URL (operator supplied)
 	std::string graphicsUuid; // the one shared camera-graphics Browser Source
 	bool graphicsVisible = true;
@@ -63,14 +69,21 @@ struct BankConfig {
 	std::string replayCueHighlightsScene; // empty = auto-detect
 	bool migratedFromV1 = false;          // set by load when an old schema was upgraded
 
-	PlaybackSlotConfig &playback(int slot) { return slot == 8 ? replay : highlights; }
-	const PlaybackSlotConfig &playback(int slot) const { return slot == 8 ? replay : highlights; }
+	// Slots 8..11: Replay, Highlights, Intermission, Video Ads.
+	PlaybackSlotConfig &playback(int slot)
+	{
+		return slot == 8 ? replay : slot == 10 ? intermission : slot == 11 ? ads : highlights;
+	}
+	const PlaybackSlotConfig &playback(int slot) const
+	{
+		return slot == 8 ? replay : slot == 10 ? intermission : slot == 11 ? ads : highlights;
+	}
 };
 
 // Default names and labels from the production brief.
 const char *defaultCameraSceneName(int cam); // "MF — CAM 01".."MF — CAM 08"
 const char *defaultCameraLabel(int cam);
-const char *defaultPlaybackSceneName(int slot); // slot 8 / 9
+const char *defaultPlaybackSceneName(int slot); // slots 8..11
 const char *defaultPlaybackLabel(int slot);
 
 BankConfig makeDefaultConfig(const std::string &bankId);

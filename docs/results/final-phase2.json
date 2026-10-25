@@ -4,7 +4,7 @@
     "graphics_source_type": "color_source_v3",
     "libobs_api_built": "30.2.3",
     "obs_version": "30.2.3.1-3~bpo24.04.1",
-    "pass": 8,
+    "pass": 9,
     "perf": {
     },
     "phase": 2,
@@ -12,11 +12,11 @@
     "recording": "",
     "results": [
         {
-            "detail": "owned=10",
+            "detail": "owned=12",
             "id": "P01",
             "pass": true,
             "t_ms": 21,
-            "title": "After restart: ten owned scenes and all camera assignments resolve by UUID"
+            "title": "After restart: twelve owned scenes and all camera assignments resolve by UUID"
         },
         {
             "detail": "",
@@ -36,35 +36,42 @@
             "detail": "slot 1",
             "id": "P04",
             "pass": true,
-            "t_ms": 21,
+            "t_ms": 23,
             "title": "After restart: last live camera identity restored"
+        },
+        {
+            "detail": "ads=2",
+            "id": "P09",
+            "pass": true,
+            "t_ms": 23,
+            "title": "After restart: Intermission page URL and the Video Ads playlist are restored"
         },
         {
             "detail": "",
             "id": "P05",
             "pass": true,
-            "t_ms": 21,
-            "title": "After restart: saved replay / highlights files are re-armed paused at the first frame"
+            "t_ms": 23,
+            "title": "After restart: saved replay / highlights files and the first ad are re-armed paused at the first frame"
         },
         {
             "detail": "Camera 1: The MatchFrame scene for this slot is missing - run Create / Repair",
             "id": "P06",
             "pass": true,
-            "t_ms": 1380,
+            "t_ms": 2328,
             "title": "Collection switch: the other collection has its own (empty) bank; no stale references used"
         },
         {
             "detail": "",
             "id": "P07",
             "pass": true,
-            "t_ms": 3366,
+            "t_ms": 4476,
             "title": "Switching back restores the original bank and switching works"
         },
         {
             "detail": "",
             "id": "P08",
             "pass": true,
-            "t_ms": 3366,
+            "t_ms": 4476,
             "title": "Playback re-armed after the collection switch"
         }
     ],
