@@ -18,7 +18,9 @@ enum PaneIndex : int {
 	kPaneCam1 = 2, // cameras 1..8 occupy 2..9
 	kPaneReplay = 10,
 	kPaneHighlights = 11,
-	kPaneCount = 12,
+	kPaneIntermission = 12,
+	kPaneAds = 13,
+	kPaneCount = 14,
 };
 
 inline int paneForCamera(int camIndex0)
@@ -38,8 +40,8 @@ struct PaneGeometry {
 
 enum class LayoutMode {
 	Auto,    // pick the arrangement that gives the largest monitors for the window size
-	Stacked, // monitors / cameras 1-4 / cameras 5-8 / compact Replay + Highlights row
-	Wide,    // monitors / cameras 1-4 + Replay / cameras 5-8 + Highlights
+	Stacked, // monitors / cameras 1-4 / cameras 5-8 / compact Replay, Highlights, Intermission, Ads row
+	Wide,    // monitors / cameras 1-4 + Replay + Intermission / cameras 5-8 + Highlights + Ads
 };
 
 struct LayoutInput {
@@ -58,10 +60,11 @@ struct Layout {
 	bool valid = false;
 };
 
-// Computes the 12-pane multiview layout with [Preview | Program] on top and the ten
-// scene tiles below, either stacked (two camera rows + a compact playback row) or wide
-// (Replay / Highlights at the end of the camera rows). Auto picks whichever fits the
-// window best. All twelve panes are always laid out (they shrink rather than disappear).
+// Computes the 14-pane multiview layout with [Preview | Program] on top and the twelve
+// scene tiles below, either stacked (two camera rows + a compact row of Replay,
+// Highlights, Intermission and Video Ads) or wide (those four at the ends of the camera
+// rows). Auto picks whichever fits the window best. All fourteen panes are always laid
+// out (they shrink rather than disappear).
 Layout computeLayout(const LayoutInput &in);
 
 // Returns the pane index under (x, y) or -1. Coordinates use the same unit as the layout.

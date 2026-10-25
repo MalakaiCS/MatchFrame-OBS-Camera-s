@@ -40,7 +40,8 @@ static double fitFactor(double available, double fixedH, double videoH)
 	return std::max(0.0, (available - fixedH) / videoH);
 }
 
-// Stacked: [Preview | Program] / cameras 1-4 / cameras 5-8 / compact [Replay | Highlights].
+// Stacked: [Preview | Program] / cameras 1-4 / cameras 5-8 /
+// compact [Replay | Highlights | Intermission | Video Ads].
 // Best for tall or narrow windows.
 static Layout stackedLayout(const LayoutInput &in, double a, double s, double L)
 {
@@ -73,15 +74,16 @@ static Layout stackedLayout(const LayoutInput &in, double a, double s, double L)
 	const int row2[] = {kPaneCam1 + 4, kPaneCam1 + 5, kPaneCam1 + 6, kPaneCam1 + 7};
 	placeRow(out, row2, 4, camW, camH, L, s, in.width, y);
 	y += camH + L + s;
-	const int pb[] = {kPaneReplay, kPaneHighlights};
-	placeRow(out, pb, 2, pbW, pbH, L, s, in.width, y);
+	const int pb[] = {kPaneReplay, kPaneHighlights, kPaneIntermission, kPaneAds};
+	placeRow(out, pb, 4, pbW, pbH, L, s, in.width, y);
 
 	out.valid = true;
 	return out;
 }
 
-// Wide: [Preview | Program] / cameras 1-4 + Replay / cameras 5-8 + Highlights.
-// One row fewer, so on 16:9 and wider screens every pane gets larger.
+// Wide: [Preview | Program] / cameras 1-4 + Replay + Intermission /
+// cameras 5-8 + Highlights + Video Ads. One row fewer, so on 16:9 and wider screens
+// the monitors get larger.
 static Layout wideLayout(const LayoutInput &in, double a, double s, double L)
 {
 	Layout out;
@@ -89,7 +91,7 @@ static Layout wideLayout(const LayoutInput &in, double a, double s, double L)
 	out.height = in.height;
 
 	double topW = (in.width - 3 * s) / 2.0;
-	double tileW = (in.width - 6 * s) / 5.0;
+	double tileW = (in.width - 7 * s) / 6.0;
 	const double fixedH = 3 * L + 4 * s;
 	const double k = fitFactor(in.height, fixedH, (topW + 2 * tileW) / a);
 	topW *= k;
@@ -104,11 +106,11 @@ static Layout wideLayout(const LayoutInput &in, double a, double s, double L)
 	const int top[] = {kPanePreview, kPaneProgram};
 	placeRow(out, top, 2, topW, topH, L, s, in.width, y);
 	y += topH + L + s;
-	const int row1[] = {kPaneCam1 + 0, kPaneCam1 + 1, kPaneCam1 + 2, kPaneCam1 + 3, kPaneReplay};
-	placeRow(out, row1, 5, tileW, tileH, L, s, in.width, y);
+	const int row1[] = {kPaneCam1 + 0, kPaneCam1 + 1, kPaneCam1 + 2, kPaneCam1 + 3, kPaneReplay, kPaneIntermission};
+	placeRow(out, row1, 6, tileW, tileH, L, s, in.width, y);
 	y += tileH + L + s;
-	const int row2[] = {kPaneCam1 + 4, kPaneCam1 + 5, kPaneCam1 + 6, kPaneCam1 + 7, kPaneHighlights};
-	placeRow(out, row2, 5, tileW, tileH, L, s, in.width, y);
+	const int row2[] = {kPaneCam1 + 4, kPaneCam1 + 5, kPaneCam1 + 6, kPaneCam1 + 7, kPaneHighlights, kPaneAds};
+	placeRow(out, row2, 6, tileW, tileH, L, s, in.width, y);
 
 	out.valid = true;
 	return out;

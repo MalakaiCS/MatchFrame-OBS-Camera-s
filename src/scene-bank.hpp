@@ -1,4 +1,4 @@
-// MatchFrame Multiview - the ten plugin-owned scenes, their sources and identities.
+// MatchFrame Multiview - the twelve plugin-owned scenes, their sources and identities.
 //
 // All methods run on the UI thread. Nothing here caches raw OBS pointers across calls:
 // every lookup resolves the persisted identity (UUID + ownership marker) on demand.
@@ -51,7 +51,7 @@ public:
 	OBSSourceAutoRelease mediaSource(int slot) const;
 	OBSSourceAutoRelease cameraGraphics() const;
 	OBSSourceAutoRelease playbackGraphics(int slot) const;
-	int slotOfScene(obs_source_t *scene) const; // 0..9 or -1
+	int slotOfScene(obs_source_t *scene) const; // 0..11 or -1
 	int slotOfSceneUuid(const std::string &uuid) const;
 	bool anySceneExists() const;
 
@@ -87,6 +87,7 @@ private:
 	OBSSourceAutoRelease resolveOrCreateMedia(int slot, RepairReport &r);
 	void repairCameraScene(int cam, obs_source_t *browser, RepairReport &r);
 	void repairPlaybackScene(int slot, RepairReport &r);
+	void repairIntermissionScene(RepairReport &r);
 
 	BankConfig &cfg_;
 };

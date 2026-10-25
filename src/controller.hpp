@@ -23,6 +23,8 @@
 
 namespace mf {
 
+constexpr int kHotkeyCount = 14; // OBS hotkeys registered by the plugin
+
 class Controller : public QObject {
 	Q_OBJECT
 
@@ -46,6 +48,8 @@ public:
 	bool toggleGraphics();
 	bool enableStudioMode();
 	bool loadPlayback(int slot, const QString &path);
+	bool loadAdsPlaylist(const QStringList &files);
+	bool applyIntermissionUrl(const QString &url, QString *message);
 	bool armPlayback(int slot);
 	bool playPausePlayback(int slot);
 	bool restartPlayback(int slot);
@@ -128,7 +132,7 @@ private:
 	int64_t rcDebounceUntil_ = 0;
 	int64_t rcCueRequestedMs_ = -100000;
 	int rcTick_ = 0;
-	std::array<obs_hotkey_id, 12> hotkeys_;
+	std::array<obs_hotkey_id, kHotkeyCount> hotkeys_;
 };
 
 } // namespace mf

@@ -11,17 +11,29 @@
 namespace mf {
 
 constexpr int kCameraCount = 8;
-constexpr int kSlotReplay = 8;     // bank slot index 8
-constexpr int kSlotHighlights = 9; // bank slot index 9
-constexpr int kSlotCount = 10;
+constexpr int kSlotReplay = 8;        // bank slot index 8
+constexpr int kSlotHighlights = 9;    // bank slot index 9
+constexpr int kSlotIntermission = 10; // graphics page (Browser Source), no media
+constexpr int kSlotAds = 11;          // video ads playlist
+constexpr int kSlotCount = 12;
 
 inline bool slotIsCamera(int slot)
 {
 	return slot >= 0 && slot < kCameraCount;
 }
+// Slots that play prepared media (armed paused, started on Program entry).
 inline bool slotIsPlayback(int slot)
 {
+	return slot == kSlotReplay || slot == kSlotHighlights || slot == kSlotAds;
+}
+// Slots MatchFrame Replay Cue can take over (Replay / Highlights only).
+inline bool slotIsReplayCue(int slot)
+{
 	return slot == kSlotReplay || slot == kSlotHighlights;
+}
+inline bool slotIsIntermission(int slot)
+{
+	return slot == kSlotIntermission;
 }
 
 // Facts about one bank slot, resolved immediately before a decision.
