@@ -56,7 +56,6 @@ enum class Reject {
 	Unassigned,
 	InputMissing,
 	PlaybackNotReady,
-	TransitionOverride, // per-scene override would turn CUT into something else
 	NoCutTransition,
 	NoTarget,         // Return Live: no last camera recorded / it no longer exists
 	AlreadyOnProgram, // Return Live target already on Program
@@ -88,8 +87,7 @@ struct CutFacts {
 	bool cutTransitionAvailable = false;
 	bool previewExists = false;
 	bool previewEqualsProgram = false;
-	bool previewOverrideConflict = false; // preview scene has a non-cut transition override
-	int previewSlot = -1;                 // bank slot of the Preview scene, -1 if outside the bank
+	int previewSlot = -1; // bank slot of the Preview scene, -1 if outside the bank
 	SlotFacts previewSlotFacts;
 };
 
@@ -114,7 +112,6 @@ struct ReturnLiveFacts {
 	bool targetExists = false;      // it still resolves to a plugin-owned camera scene
 	bool targetInputExists = false; // and that camera still has its input
 	bool targetOnProgram = false;
-	bool targetOverrideConflict = false;
 };
 
 CutDecision evaluateReturnLive(const ReturnLiveFacts &f);
@@ -139,6 +136,9 @@ public:
 	// Releases a stuck take after the timeout. Returns true if it timed out.
 	bool tick(int64_t nowMs);
 	void setDisabled(bool disabled);
+	// A take with a long transition (e.g. a 3 s fade) needs longer before it is released.
+	void setTimeoutMs(int64_t ms) { timeoutMs_ = ms; }
+	int64_t timeoutMs() const { return timeoutMs_; }
 
 	uint64_t dropped() const { return dropped_; }
 

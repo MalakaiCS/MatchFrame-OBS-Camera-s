@@ -543,8 +543,15 @@ void MultiviewWindow::updateToolbar()
 	}
 	SwitchView sv = c->switcher().view();
 
+	// The button names what the take will do: CUT, or TAKE · Fade 500 ms for a scene with
+	// its own transition (Setup → Transitions).
+	const bool hardCut = sv.previewTransition == "Cut";
+	const QString via = QString::fromStdString(sv.previewTransition);
+	cut_->setText(hardCut ? "CUT" : QString("TAKE · %1").arg(via));
 	cut_->setEnabled(sv.cutEnabled);
-	cut_->setToolTip(sv.cutEnabled ? "Hard cut Preview → Program" : QString::fromStdString(sv.cutReason));
+	cut_->setToolTip(!sv.cutEnabled ? QString::fromStdString(sv.cutReason)
+			 : hardCut      ? "Hard cut Preview → Program"
+					: QString("Preview → Program with %1 (this scene's transition)").arg(via));
 	studio_->setVisible(!sv.studioMode);
 
 	QString rl = "RETURN LIVE";
@@ -552,8 +559,10 @@ void MultiviewWindow::updateToolbar()
 		rl += QString(" → CAM %1").arg(sv.lastCameraSlot + 1);
 	returnLive_->setText(rl);
 	returnLive_->setEnabled(sv.returnLiveEnabled);
-	returnLive_->setToolTip(sv.returnLiveEnabled ? "Immediate on-air cut to the last camera that was on Program"
-						     : QString::fromStdString(sv.returnLiveReason));
+	returnLive_->setToolTip(sv.returnLiveEnabled
+					? "Immediate on-air take of the last camera that was on Program, with that "
+					  "camera scene's transition"
+					: QString::fromStdString(sv.returnLiveReason));
 	returnLive_->setStyleSheet(sv.returnLiveEnabled && sv.programSlot >= kCameraCount
 					   ? "QPushButton{background:#7a4a00;color:white;font-weight:bold;}"
 					   : "");
@@ -568,10 +577,9 @@ void MultiviewWindow::updateToolbar()
 				      ? "Browser Source is not available in this OBS installation"
 				      : "Show / hide the shared MatchFrame overlay in all eight camera scenes");
 
-	transition_->setText(
-		sv.transitionIsCut
-			? "Transition: Cut"
-			: QString("Transition: %1 (CUT selects Cut)").arg(QString::fromStdString(sv.transitionName)));
+	transition_->setText(QString("Next take: %1").arg(via));
+	transition_->setToolTip("The transition the Preview scene uses when it is taken. Set it per scene in "
+				"Setup → Transitions (default Cut).");
 	QString st;
 	if (!sv.studioMode)
 		st = "STUDIO MODE OFF – plugin takes disabled";

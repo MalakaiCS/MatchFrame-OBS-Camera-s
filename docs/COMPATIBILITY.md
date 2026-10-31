@@ -37,9 +37,10 @@
     / `obs_frontend_set_current_transition` / `obs_frontend_set_current_scene` are
     synchronous when called from the UI thread (Qt auto connection) in both versions.
   - Per-scene transition overrides are stored in the scene's private settings
-    (`"transition"`, `"transition_duration"`) and applied by the frontend on take: the plugin
-    refuses CUT when an override names a non-Cut transition and Repair clears them on the ten
-    owned scenes.
+    (`"transition"`, `"transition_duration"`) and applied by the frontend when that scene is
+    transitioned to Program in Studio Mode (Transition button, `preview_program_trigger_transition`,
+    `set_current_scene`). Setup → Transitions writes exactly these keys; the plugin selects Cut
+    as the base transition so scenes without a setting hard-cut.
   - Studio Mode *Duplicate Scene* (default ON) puts a private duplicate of the scene on
     Program (`OBS_SCENE_DUP_PRIVATE_REFS`: same sources). The graphics toggle therefore also
     updates the items in the Program instance. *Duplicate Sources* (`EditPropertiesMode`,

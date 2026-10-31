@@ -2,6 +2,8 @@
 
 #include "controller.hpp"
 
+#include <obs-frontend-api.h>
+
 #include <QCheckBox>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -311,6 +313,36 @@ void SetupDialog::build()
 	connect(rcHighlightsScene_, &QComboBox::activated, this, sceneChanged);
 	root->addWidget(rcBox);
 
+	// --- Transitions
+	auto *tBox = new QGroupBox("Transitions (used when each scene is taken to Program: CUT, Return Live, and "
+				   "OBS's own Transition button). Default: Cut",
+				   this);
+	auto *tl = new QGridLayout(tBox);
+	for (int half = 0; half < 2; half++) {
+		tl->addWidget(new QLabel("<b>Scene</b>"), 0, half * 4);
+		tl->addWidget(new QLabel("<b>Transition</b>"), 0, half * 4 + 1);
+		tl->addWidget(new QLabel("<b>Duration</b>"), 0, half * 4 + 2);
+	}
+	for (int slot = 0; slot < (int)transitions_.size(); slot++) {
+		TransitionRow &t = transitions_[(size_t)slot];
+		t.name = new QLabel;
+		t.transition = new QComboBox;
+		t.transition->setMinimumWidth(150);
+		t.duration = new QSpinBox;
+		t.duration->setRange(50, 20000);
+		t.duration->setSingleStep(50);
+		t.duration->setSuffix(" ms");
+		t.duration->setKeyboardTracking(false); // apply once the value is entered, not per digit
+		const int half = slot < 6 ? 0 : 1, row = slot % 6 + 1;
+		tl->addWidget(t.name, row, half * 4);
+		tl->addWidget(t.transition, row, half * 4 + 1);
+		tl->addWidget(t.duration, row, half * 4 + 2);
+		connect(t.transition, &QComboBox::currentIndexChanged, this, [this, slot]() { applyTransition(slot); });
+		connect(t.duration, &QSpinBox::valueChanged, this, [this, slot]() { applyTransition(slot); });
+	}
+	tl->setColumnMinimumWidth(3, 24);
+	root->addWidget(tBox);
+
 	// --- Repair
 	auto *rBox = new QHBoxLayout;
 	repair_ = new QPushButton("Create / Repair MatchFrame Scenes");
@@ -359,6 +391,7 @@ void SetupDialog::reload()
 		r.input->setCurrentIndex(sel);
 	}
 	graphicsUrl_->setText(QString::fromStdString(cfg.graphicsUrl));
+	reloadTransitions();
 	intermissionLabel_->setText(QString::fromStdString(cfg.intermission.label));
 	intermissionUrl_->setText(QString::fromStdString(cfg.intermission.graphicsUrl));
 	{
@@ -502,6 +535,66 @@ void SetupDialog::refreshStatus()
 							  : QString::fromStdString(names.second)));
 		rcState_->setStyleSheet("QLabel{color:#9ccc65;}");
 	}
+}
+
+void SetupDialog::reloadTransitions()
+{
+	BankConfig &cfg = controller_->config();
+	const std::vector<std::string> names = transitionNames();
+	for (int slot = 0; slot < (int)transitions_.size(); slot++) {
+		TransitionRow &t = transitions_[(size_t)slot];
+		QSignalBlocker b1(t.transition), b2(t.duration);
+		const QString label = slot < 8 ? QString("%1 · %2").arg(slot + 1).arg(
+							 QString::fromStdString(cfg.cameras[(size_t)slot].label))
+					       : QString::fromStdString(cfg.playback(slot).label);
+		t.name->setText(label.toHtmlEscaped());
+		OBSSourceAutoRelease scene = controller_->bank().slotScene(slot);
+		const std::string current = sceneTransitionOverride(scene);
+		t.transition->clear();
+		t.transition->addItem("Cut", QString()); // no per-scene setting
+		int sel = 0;
+		for (const std::string &n : names) {
+			OBSSourceAutoRelease tr = findTransitionByName(n);
+			if (transitionIsCutType(tr))
+				continue;
+			t.transition->addItem(QString::fromStdString(n), QString::fromStdString(n));
+			if (n == current)
+				sel = t.transition->count() - 1;
+		}
+		if (!current.empty() && sel == 0) {
+			// Set to a transition that no longer exists: OBS ignores it (Cut is used).
+			t.transition->addItem(QString("⚠ missing: %1").arg(QString::fromStdString(current)),
+					      QString::fromStdString(current));
+			sel = t.transition->count() - 1;
+		}
+		t.transition->setCurrentIndex(sel);
+		t.duration->setValue(sceneTransitionDuration(scene));
+		OBSSourceAutoRelease tr = current.empty() ? nullptr : findTransitionByName(current);
+		t.duration->setEnabled(scene && tr && !transitionIsFixed(tr));
+		t.transition->setEnabled(scene != nullptr);
+		t.transition->setToolTip(scene ? "Used whenever this scene is taken to Program"
+					       : "Scene not created yet - run Create / Repair");
+	}
+}
+
+void SetupDialog::applyTransition(int slot)
+{
+	if (loading_)
+		return;
+	TransitionRow &t = transitions_[(size_t)slot];
+	const std::string name = t.transition->currentData().toString().toStdString();
+	OBSSourceAutoRelease tr = name.empty() ? nullptr : findTransitionByName(name);
+	int ms = t.duration->value();
+	if (tr && !transitionIsFixed(tr) && !t.duration->isEnabled()) {
+		// First time this scene gets an adjustable transition: start from OBS's duration.
+		ms = obs_frontend_get_transition_duration();
+		QSignalBlocker block(t.duration);
+		t.duration->setValue(ms);
+	}
+	t.duration->setEnabled(tr && !transitionIsFixed(tr));
+	QString msg;
+	bool ok = controller_->setSlotTransition(slot, name, ms, &msg);
+	controller_->setMessage(msg, !ok);
 }
 
 void SetupDialog::repair()

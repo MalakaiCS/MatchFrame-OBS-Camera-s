@@ -50,6 +50,8 @@ public:
 	bool loadPlayback(int slot, const QString &path);
 	bool loadAdsPlaylist(const QStringList &files);
 	bool applyIntermissionUrl(const QString &url, QString *message);
+	// The transition used when this slot's scene is taken to Program ("" = Cut).
+	bool setSlotTransition(int slot, const std::string &name, int durationMs, QString *message);
 	bool armPlayback(int slot);
 	bool playPausePlayback(int slot);
 	bool restartPlayback(int slot);

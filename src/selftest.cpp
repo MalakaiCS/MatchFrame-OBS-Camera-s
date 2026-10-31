@@ -729,14 +729,24 @@ private:
 			check("C09", "Unassigned camera slot cannot be selected (partial bank)", !sel8 && previewKept,
 			      ctl()->lastMessage());
 		});
-		add("C11b repair clears overrides", [this]() {
+		add("C11b repair keeps scene transitions", [this]() {
 			OBSSourceAutoRelease s4 = ctl()->bank().slotScene(3);
-			OBSDataAutoRelease priv = obs_source_get_private_settings(s4);
-			obs_data_set_string(priv, "transition", "Fade");
-			ctl()->createOrRepair();
-			OBSDataAutoRelease priv2 = obs_source_get_private_settings(s4);
-			check("C11b", "Create / Repair clears transition overrides on the owned scenes",
-			      strlen(obs_data_get_string(priv2, "transition")) == 0);
+			OBSSourceAutoRelease s5 = ctl()->bank().slotScene(4);
+			bool set = ctl()->setSlotTransition(3, "Fade", 400, nullptr);
+			setSceneTransition(s5, "No Such Transition", 500); // e.g. a deleted stinger
+			RepairReport r = ctl()->createOrRepair();
+			bool warned = false;
+			for (auto &l : r.lines)
+				warned = warned || l.find("No Such Transition") != std::string::npos;
+			const std::string kept = describeSceneTransition(s4);
+			check("C11b",
+			      "Create / Repair keeps each scene's transition; a setting naming a deleted transition is "
+			      "removed with a warning",
+			      set && kept == "Fade 400 ms" && sceneTransitionOverride(s5).empty() && warned,
+			      QString("CAM 4: %1; CAM 5 override '%2'")
+				      .arg(QString::fromStdString(kept),
+					   QString::fromStdString(sceneTransitionOverride(s5))));
+			ctl()->setSlotTransition(3, "", 0, nullptr); // back to Cut for the following checks
 		});
 		add("assign camera 8", [this, cams]() {
 			QString m;
@@ -781,7 +791,8 @@ private:
 		add("C10 verify", [this]() {
 			OBSSourceAutoRelease tr = obs_frontend_get_current_transition();
 			OBSSourceAutoRelease out = obs_get_output_source(0);
-			check("C10", "CUT moves Preview to Program with the Cut transition (no fade)",
+			check("C10",
+			      "CUT of a scene without its own transition is a hard cut, even when Fade was selected",
 			      programIs(1) && strcmp(obs_source_get_unversioned_id(tr), "cut_transition") == 0 &&
 				      out.Get() == tr.Get(),
 			      QString("program after %1 ms; transition '%2'")
@@ -789,20 +800,55 @@ private:
 				      .arg(QString::fromStdString(nameOf(tr))));
 		});
 
-		// ---- Per-scene override conflicts
-		add("C11 transition override", [this]() {
-			OBSSourceAutoRelease s3 = ctl()->bank().slotScene(2);
-			OBSDataAutoRelease priv = obs_source_get_private_settings(s3);
-			OBSSourceAutoRelease fade = findTransitionByName("Fade");
-			obs_data_set_string(priv, "transition", fade ? "Fade" : "Fade");
-			obs_data_set_int(priv, "transition_duration", 800);
-			ctl()->selectSlot(2);
-			bool rejected = !ctl()->cut();
-			QString msg = ctl()->lastMessage();
-			bool programKept = programIs(1);
-			check("C11", "A per-scene non-Cut override blocks CUT with a clear message (no silent fade)",
-			      rejected && programKept && msg.contains("override"), msg);
-			clearTransitionOverride(s3); // operator corrects it
+		// ---- Per-scene transitions (Setup → Transitions)
+		add(
+			"C11 take with the scene's transition",
+			[this]() {
+				ctl()->setSlotTransition(2, "Fade", 800, nullptr);
+				ctl()->selectSlot(2);
+				takeLabel_ = ctl()->switcher().view().previewTransition;
+				sawTransition_ = false;
+				cutStart_ = nowMs();
+				takeAccepted_ = ctl()->cut();
+			},
+			[this]() {
+				if (transitionInProgress())
+					sawTransition_ = true;
+				return programIs(2) && !transitionInProgress() && !ctl()->switcher().takeState().busy();
+			},
+			6000);
+		add("C11 verify", [this, expectedLastCam]() {
+			*expectedLastCam = 2;
+			const int64_t ms = nowMs() - cutStart_;
+			check("C11",
+			      "A scene set to Fade 800 ms is taken with that fade (button shows it); other scenes still "
+			      "hard cut",
+			      takeAccepted_ && sawTransition_ && ms >= 600 && takeLabel_ == "Fade 800 ms",
+			      QString("label '%1', fade seen=%2, program after %3 ms")
+				      .arg(QString::fromStdString(takeLabel_))
+				      .arg(sawTransition_)
+				      .arg(ms));
+		});
+		cutTo(kSlotIntermission, "Intermission (Cut)");
+		add(
+			"C11c Return Live with the camera's transition",
+			[this]() {
+				sawTransition_ = false;
+				cutStart_ = nowMs();
+				takeAccepted_ = ctl()->returnLive();
+			},
+			[this]() {
+				if (transitionInProgress())
+					sawTransition_ = true;
+				return programIs(2) && !transitionInProgress() && !ctl()->switcher().takeState().busy();
+			},
+			6000);
+		add("C11c verify", [this]() {
+			const int64_t ms = nowMs() - cutStart_;
+			check("C11c", "Return Live uses the target camera scene's transition (Fade 800 ms)",
+			      takeAccepted_ && sawTransition_ && ms >= 600 && programIs(2),
+			      QString("fade seen=%1, program after %2 ms").arg(sawTransition_).arg(ms));
+			ctl()->setSlotTransition(2, "", 0, nullptr); // back to Cut
 		});
 		cutTo(2, "CAM 3");
 
@@ -1827,6 +1873,8 @@ private:
 	bool imPreviewOk_ = false, adsLoadOk_ = false;
 	int startCount_ = 0;
 	int64_t cutStart_ = 0;
+	std::string takeLabel_;
+	bool sawTransition_ = false, takeAccepted_ = false;
 	int sceneChangedBefore_ = 0, programChanges_ = 0, repeatAccepted_ = 0, repeatDropped_ = 0;
 	std::string lastProgramSeen_;
 	bool replayLoadOk_ = false, highlightsLoadOk_ = false;

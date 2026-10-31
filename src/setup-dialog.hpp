@@ -8,6 +8,7 @@
 #include <QLineEdit>
 #include <QPlainTextEdit>
 #include <QPushButton>
+#include <QSpinBox>
 
 #include <array>
 
@@ -43,7 +44,15 @@ private:
 		QPushButton *overlayApply = nullptr;
 	};
 
+	struct TransitionRow {
+		QLabel *name = nullptr;
+		QComboBox *transition = nullptr;
+		QSpinBox *duration = nullptr;
+	};
+
 	void build();
+	void reloadTransitions();
+	void applyTransition(int slot);
 	void refreshStatus();
 	void applyLabels();
 	void repair();
@@ -56,6 +65,7 @@ private:
 	QPushButton *applyUrl_ = nullptr;
 	QLabel *graphicsState_ = nullptr;
 	QCheckBox *programOnly_ = nullptr;
+	std::array<TransitionRow, 12> transitions_; // one per bank slot
 	QLabel *intermissionScene_ = nullptr;
 	QLineEdit *intermissionLabel_ = nullptr;
 	QLineEdit *intermissionUrl_ = nullptr;

@@ -284,6 +284,21 @@ void SceneBank::applyFramingToItem(obs_sceneitem_t *item, Framing framing)
 // ---------------------------------------------------------------------------
 // create / repair
 
+// Each scene keeps the transition chosen for it in Setup. Only a setting that names a
+// transition which no longer exists is removed (OBS would silently ignore it).
+static void checkSceneTransition(obs_source_t *scene, RepairReport &r)
+{
+	const std::string name = sceneTransitionOverride(scene);
+	if (name.empty())
+		return;
+	OBSSourceAutoRelease tr = findTransitionByName(name);
+	if (tr)
+		return;
+	clearTransitionOverride(scene);
+	r.warn("'" + nameOf(scene) + "' was set to transition '" + name +
+	       "', which no longer exists - it now uses Cut (choose another in Setup → Transitions)");
+}
+
 OBSSourceAutoRelease SceneBank::resolveOrCreateScene(int slot, RepairReport &r)
 {
 	OBSSourceAutoRelease src = slotScene(slot);
@@ -426,10 +441,7 @@ void SceneBank::repairCameraScene(int cam, obs_source_t *browser, RepairReport &
 	CameraSlotConfig &c = cfg_.cameras[cam];
 	c.sceneName = nameOf(sceneSrc);
 
-	if (!sceneTransitionOverride(sceneSrc).empty()) {
-		clearTransitionOverride(sceneSrc);
-		r.add("Removed per-scene transition override from '" + c.sceneName + "'");
-	}
+	checkSceneTransition(sceneSrc, r);
 
 	obs_sceneitem_t *camItem = nullptr;
 	OBSSourceAutoRelease input = cameraInput(cam);
@@ -478,10 +490,7 @@ void SceneBank::repairPlaybackScene(int slot, RepairReport &r)
 	PlaybackSlotConfig &p = cfg_.playback(slot);
 	p.sceneName = nameOf(sceneSrc);
 
-	if (!sceneTransitionOverride(sceneSrc).empty()) {
-		clearTransitionOverride(sceneSrc);
-		r.add("Removed per-scene transition override from '" + p.sceneName + "'");
-	}
+	checkSceneTransition(sceneSrc, r);
 
 	obs_sceneitem_t *mItem = nullptr;
 	if (mediaAvailable()) {
@@ -541,10 +550,7 @@ void SceneBank::repairIntermissionScene(RepairReport &r)
 		return;
 	PlaybackSlotConfig &p = cfg_.intermission;
 	p.sceneName = nameOf(sceneSrc);
-	if (!sceneTransitionOverride(sceneSrc).empty()) {
-		clearTransitionOverride(sceneSrc);
-		r.add("Removed per-scene transition override from '" + p.sceneName + "'");
-	}
+	checkSceneTransition(sceneSrc, r);
 	if (!browserAvailable()) {
 		r.warn("Browser Source is not available - the Intermission scene has no graphics page");
 		return;

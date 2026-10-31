@@ -73,17 +73,17 @@ read from OBS's real output state.
 
 ### Linux (built and tested: x86_64, OBS 30.2.x)
 
-Per-user install from `dist/matchframe-multiview-1.3.0-linux-x86_64.tar.gz`:
+Per-user install from `dist/matchframe-multiview-1.4.0-linux-x86_64.tar.gz`:
 
 ```bash
 mkdir -p ~/.config/obs-studio/plugins
-tar -xzf matchframe-multiview-1.3.0-linux-x86_64.tar.gz -C ~/.config/obs-studio/plugins
+tar -xzf matchframe-multiview-1.4.0-linux-x86_64.tar.gz -C ~/.config/obs-studio/plugins
 # result: ~/.config/obs-studio/plugins/matchframe-multiview/bin/64bit/matchframe-multiview.so
 #         ~/.config/obs-studio/plugins/matchframe-multiview/data/locale/en-US.ini
 ```
 
-Or install system-wide with the Debian package (`dist/matchframe-multiview-1.3.0-x86_64-linux-gnu.deb`):
-`sudo apt install ./matchframe-multiview-1.3.0-x86_64-linux-gnu.deb`.
+Or install system-wide with the Debian package (`dist/matchframe-multiview-1.4.0-x86_64-linux-gnu.deb`):
+`sudo apt install ./matchframe-multiview-1.4.0-x86_64-linux-gnu.deb`.
 
 Restart OBS. **Tools → MatchFrame Multiview** should appear, and the OBS log should show
 `[matchframe-multiview] plugin loaded successfully`.
@@ -102,17 +102,17 @@ across major versions, so build from source for any other OBS version (see §8).
 Built by CI on GitHub's `windows-2022` runners (MSVC, against OBS 31.1.1 from
 `buildspec.json`). **Compiled, not runtime-tested.**
 
-* **Installer:** run `matchframe-multiview-1.3.0-windows-x64-Installer.exe`. Close OBS first.
+* **Installer:** run `matchframe-multiview-1.4.0-windows-x64-Installer.exe`. Close OBS first.
   It installs into `%ProgramData%\obs-studio\plugins\matchframe-multiview\`, which OBS 30+
   loads automatically, and registers an uninstaller under *Settings → Apps*.
-* **Manual:** extract `matchframe-multiview-1.3.0-windows-x64.zip` into
+* **Manual:** extract `matchframe-multiview-1.4.0-windows-x64.zip` into
   `%ProgramData%\obs-studio\plugins\`. To uninstall, delete that folder.
 
 ### macOS (universal: Apple silicon + Intel, OBS 30 or newer)
 
 Built by CI on GitHub's `macos-15` runners. **Compiled, not runtime-tested.**
 
-* **Installer:** open `matchframe-multiview-1.3.0-macos-universal.pkg`. It installs
+* **Installer:** open `matchframe-multiview-1.4.0-macos-universal.pkg`. It installs
   `matchframe-multiview.plugin` into `~/Library/Application Support/obs-studio/plugins/`.
   The package is **unsigned and not notarized**, because no Apple Developer ID is set up in CI.
   macOS will block it the first time: right-click (or Control-click) the `.pkg` and choose
@@ -149,9 +149,9 @@ The workflow uses them automatically.
    plugin takes are disabled without it.
 
 **Create / Repair** is idempotent. It reuses plugin-owned objects and recreates only what's
-missing. It restores the graphics item above the camera, clears per-scene transition
-overrides on the ten owned scenes, and keeps your manual framing, filters and input
-properties. It never switches Program and never starts an output. If a default name is
+missing. It restores the graphics item above the camera, keeps each scene's transition
+(removing only one that names a transition you have since deleted), and keeps your manual
+framing, filters and input properties. It never switches Program and never starts an output. If a default name is
 taken by an unrelated object, it uses `… (2)` and reports it. It is **disabled while
 streaming or recording**, and so are input assignments. Switching, loading media into an
 off-air playback slot, transport and graphics visibility all still work then.
@@ -187,9 +187,7 @@ when that reloads the page. Camera cuts never touch the browser.
   CUT is refused while another OBS transition is still running.
 * CUT is refused, with a message, when:
   - the Preview camera is unassigned or its input was deleted;
-  - a playback scene is not READY;
-  - the Preview scene has a per-scene transition override that isn't Cut. The plugin never
-    silently fades; remove the override or run Repair.
+  - a playback scene is not READY.
 * If Preview and Program are the same scene, CUT does nothing and never restarts media.
 * After a cut, the plugin shows whatever OBS really did. That includes OBS's "swap Preview
   and Program" preference.
@@ -199,6 +197,28 @@ when that reloads the page. Camera cuts never touch the browser.
   you edit visibility by hand in OBS and the scenes disagree, the button shows **MIXED**
   until you apply a global state. This control doesn't affect the Replay/Highlights
   overlays.
+
+### Transitions per scene
+
+Every scene takes a hard **Cut** unless you choose otherwise. In **Setup → Transitions**,
+pick a transition for any of the twelve scenes, such as a Stinger into Replay, a 500 ms
+Fade into Intermission, or a Fade back to the main camera. Set a duration for the
+transitions that have one. The list shows the transitions in OBS's Scene Transitions dock,
+so add a Stinger or Fade there first.
+
+* The setting is the transition used when **that scene is taken to Program**:
+  - **CUT** uses the Preview scene's transition;
+  - **Return Live** uses the camera's transition;
+  - OBS's own Transition button and hotkeys use it too.
+
+  The button changes from **CUT** to **TAKE · Fade 500 ms**, and *Next take:* in the toolbar
+  shows what the Preview scene will use.
+* It is OBS's own per-scene *Transition Override* (right-click a scene in OBS), so a choice
+  made in either place shows in the other. It is saved with the scene collection.
+* Replay, Highlights and Video Ads start playing as soon as their scene starts to come on
+  air, so with a Fade or Stinger the clip runs underneath it.
+* A take with a transition is still one take. Further presses are ignored until it
+  finishes, and Preview selection keeps working meanwhile.
 
 ### Replay and Highlights
 

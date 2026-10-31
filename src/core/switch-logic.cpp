@@ -25,8 +25,6 @@ const char *rejectMessage(Reject r)
 		return "The assigned camera input no longer exists";
 	case Reject::PlaybackNotReady:
 		return "Playback is not READY - load and arm a file first";
-	case Reject::TransitionOverride:
-		return "Scene has a per-scene transition override that is not Cut - remove it (or run Repair)";
 	case Reject::NoCutTransition:
 		return "OBS has no Cut transition available";
 	case Reject::NoTarget:
@@ -99,8 +97,6 @@ CutDecision evaluateCut(const CutFacts &f)
 		if (r != Reject::None)
 			return reject(r);
 	}
-	if (f.previewOverrideConflict)
-		return reject(Reject::TransitionOverride);
 	if (!f.cutTransitionAvailable)
 		return reject(Reject::NoCutTransition);
 	d.action = CutAction::Execute;
@@ -130,8 +126,6 @@ CutDecision evaluateReturnLive(const ReturnLiveFacts &f)
 		return reject(Reject::InputMissing);
 	if (f.targetOnProgram)
 		return reject(Reject::AlreadyOnProgram);
-	if (f.targetOverrideConflict)
-		return reject(Reject::TransitionOverride);
 	if (!f.cutTransitionAvailable)
 		return reject(Reject::NoCutTransition);
 	d.action = CutAction::Execute;

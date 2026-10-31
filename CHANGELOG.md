@@ -1,5 +1,22 @@
 # Changelog
 
+## v1.4.0 — 2026-10-31
+
+### Added
+- **A transition for each scene.** Setup → Transitions has one row per scene (all twelve):
+  Cut (the default), or any transition from OBS's Scene Transitions dock (Fade, Stinger,
+  Swipe…), with a duration where the transition has one.
+  - CUT uses the Preview scene's transition, and Return Live uses the camera's.
+  - The button reads **TAKE · Fade 500 ms** when the Preview scene has its own transition,
+    and the toolbar shows *Next take:*.
+  - It is OBS's own per-scene Transition Override, so OBS's Transition button and hotkeys
+    use it too, and it is saved with the scene collection.
+
+### Changed
+- A per-scene transition no longer blocks CUT. It is now the scene's chosen transition.
+- Create / Repair keeps scene transitions. It removes only one that names a transition that
+  no longer exists, and warns.
+
 ## v1.3.0 — 2026-10-25
 
 ### Added

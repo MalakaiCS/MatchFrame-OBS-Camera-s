@@ -197,6 +197,31 @@ bool Controller::applyIntermissionUrl(const QString &url, QString *message)
 	return ok;
 }
 
+bool Controller::setSlotTransition(int slot, const std::string &name, int durationMs, QString *message)
+{
+	OBSSourceAutoRelease scene = bank_.slotScene(slot);
+	if (!scene) {
+		if (message)
+			*message = "Scene not created yet - run Create / Repair first";
+		return false;
+	}
+	OBSSourceAutoRelease tr = name.empty() ? nullptr : findTransitionByName(name);
+	if (!name.empty() && !tr) {
+		if (message)
+			*message = QString("Transition '%1' does not exist").arg(QString::fromStdString(name));
+		return false;
+	}
+	// Cut itself is stored as "no setting": the plugin's takes use Cut by default.
+	const bool cut = !tr || transitionIsCutType(tr);
+	setSceneTransition(scene, cut ? "" : name, std::clamp(durationMs, 50, 20000));
+	const std::string desc = describeSceneTransition(scene);
+	obs_log(LOG_INFO, "transition for '%s': %s", nameOf(scene).c_str(), desc.c_str());
+	if (message)
+		*message = QString("%1 now uses %2").arg(slotLabel(slot), QString::fromStdString(desc));
+	emit stateChanged();
+	return true;
+}
+
 bool Controller::armPlayback(int slot)
 {
 	std::string msg;

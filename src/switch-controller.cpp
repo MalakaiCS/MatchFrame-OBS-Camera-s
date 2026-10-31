@@ -80,7 +80,6 @@ CutFacts SwitchController::cutFacts()
 	f.previewExists = preview != nullptr;
 	f.previewEqualsProgram = preview && program && preview.Get() == program.Get();
 	if (preview) {
-		f.previewOverrideConflict = overrideConflicts(preview);
 		f.previewSlot = bank_.slotOfScene(preview);
 		if (f.previewSlot >= 0)
 			f.previewSlotFacts = slotFacts(f.previewSlot);
@@ -99,26 +98,23 @@ bool SwitchController::cut(std::string *message)
 		return true;
 	}
 	if (d.action == CutAction::Reject) {
-		if (message) {
+		if (message)
 			*message = rejectMessage(d.reason);
-			if (d.reason == Reject::TransitionOverride) {
-				OBSSourceAutoRelease preview = obs_frontend_get_current_preview_scene();
-				std::string name;
-				overrideConflicts(preview, &name);
-				*message += " ('" + nameOf(preview) + "' overrides with '" + name + "')";
-			}
-		}
 		return false;
 	}
+	// Cut is the base transition; a scene's own transition setting (OBS's per-scene
+	// override) is applied by OBS when that scene is taken.
 	if (!ensureCutTransition(message))
 		return false;
+	OBSSourceAutoRelease preview = obs_frontend_get_current_preview_scene();
+	prepareTake(preview);
 	if (!take_.tryBegin(nowMs())) {
 		if (message)
 			*message = rejectMessage(Reject::Busy);
 		return false;
 	}
-	OBSSourceAutoRelease preview = obs_frontend_get_current_preview_scene();
-	obs_log(LOG_INFO, "CUT: '%s' -> Program", nameOf(preview).c_str());
+	obs_log(LOG_INFO, "TAKE: '%s' -> Program (%s)", nameOf(preview).c_str(),
+		describeSceneTransition(preview).c_str());
 	obs_frontend_preview_program_trigger_transition();
 	reconcile();
 	return true;
@@ -144,7 +140,6 @@ ReturnLiveFacts SwitchController::returnLiveFacts(OBSSourceAutoRelease &target)
 		f.targetInputExists = input != nullptr;
 		OBSSourceAutoRelease program = obs_frontend_get_current_scene();
 		f.targetOnProgram = target && program && target.Get() == program.Get();
-		f.targetOverrideConflict = target && overrideConflicts(target);
 	}
 	return f;
 }
@@ -162,17 +157,30 @@ bool SwitchController::returnLive(std::string *message)
 	}
 	if (!ensureCutTransition(message))
 		return false;
+	prepareTake(target);
 	if (!take_.tryBegin(nowMs())) {
 		if (message)
 			*message = rejectMessage(Reject::Busy);
 		return false;
 	}
-	obs_log(LOG_INFO, "RETURN LIVE: '%s' -> Program", nameOf(target).c_str());
+	obs_log(LOG_INFO, "RETURN LIVE: '%s' -> Program (%s)", nameOf(target).c_str(),
+		describeSceneTransition(target).c_str());
 	// In Studio Mode this transitions the given scene straight to Program without
 	// changing what the operator has staged in Preview.
 	obs_frontend_set_current_scene(target);
 	reconcile();
 	return true;
+}
+
+void SwitchController::prepareTake(obs_source_t *target)
+{
+	// Keep the take serialized for as long as the target's transition can run.
+	int64_t ms = 2000;
+	const std::string name = sceneTransitionOverride(target);
+	OBSSourceAutoRelease tr = name.empty() ? nullptr : findTransitionByName(name);
+	if (tr && !transitionIsCutType(tr))
+		ms += transitionIsFixed(tr) ? 10000 : sceneTransitionDuration(target);
+	take_.setTimeoutMs(ms);
 }
 
 void SwitchController::reconcile()
@@ -217,6 +225,7 @@ SwitchView SwitchController::view()
 	v.transitionName = nameOf(tr);
 	v.transitionIsCut = tr && strcmp(obs_source_get_unversioned_id(tr), "cut_transition") == 0;
 	v.lastCameraSlot = bank_.slotOfSceneUuid(tracker_.lastCameraId());
+	v.previewTransition = preview ? describeSceneTransition(preview) : "Cut";
 
 	CutFacts cf = cutFacts();
 	CutDecision cd = evaluateCut(cf);

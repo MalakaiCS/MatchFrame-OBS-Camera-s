@@ -354,9 +354,6 @@ TEST(cut_rules)
 	f.studioMode = false;
 	CHECK(evaluateCut(f).reason == Reject::StudioModeOff);
 	f = cutOk();
-	f.previewOverrideConflict = true;
-	CHECK(evaluateCut(f).reason == Reject::TransitionOverride);
-	f = cutOk();
 	f.cutTransitionAvailable = false;
 	CHECK(evaluateCut(f).reason == Reject::NoCutTransition);
 	f = cutOk();
@@ -411,6 +408,13 @@ TEST(take_state_machine_suppresses_repeats)
 	t.complete();
 	t.complete();
 	CHECK(t.state() == TakeStateMachine::State::Idle);
+	// a long transition (3 s fade): the take stays serialized until it can have finished
+	t.setTimeoutMs(5000);
+	CHECK(t.tryBegin(10000));
+	CHECK(!t.tick(13000));
+	CHECK(t.busy());
+	CHECK(t.tick(15001));
+	CHECK(!t.busy());
 }
 
 TEST(last_camera_tracker)
@@ -460,9 +464,6 @@ TEST(return_live_rules)
 	g = f;
 	g.busy = true;
 	CHECK(evaluateReturnLive(g).reason == Reject::Busy);
-	g = f;
-	g.targetOverrideConflict = true;
-	CHECK(evaluateReturnLive(g).reason == Reject::TransitionOverride);
 	CHECK(std::string(rejectMessage(Reject::NoTarget)).size() > 5);
 }
 
