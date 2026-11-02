@@ -26,6 +26,7 @@ public:
 private:
 	struct CamRow {
 		QLabel *slot = nullptr;
+		QWidget *framing = nullptr; // holds the Fit / Fill buttons (hidden with the row)
 		QLineEdit *label = nullptr;
 		QComboBox *input = nullptr;
 		QLabel *scene = nullptr;
@@ -45,6 +46,7 @@ private:
 	};
 
 	struct TransitionRow {
+		QWidget *cell = nullptr; // name, picker and duration, hidden together for unused cameras
 		QLabel *name = nullptr;
 		QComboBox *transition = nullptr;
 		QSpinBox *duration = nullptr;
@@ -52,20 +54,22 @@ private:
 
 	void build();
 	void reloadTransitions();
+	void showCameraRows(); // only the cameras in use
 	void applyTransition(int slot);
 	void refreshStatus();
 	void applyLabels();
 	void repair();
 
 	Controller *controller_;
-	std::array<CamRow, 8> cams_;
+	std::array<CamRow, 16> cams_;
+	QSpinBox *cameraCount_ = nullptr;
 	std::array<PbRow, 3> pbs_; // Replay, Highlights, Video Ads
 	QLineEdit *graphicsUrl_ = nullptr;
 	QPushButton *showUrl_ = nullptr;
 	QPushButton *applyUrl_ = nullptr;
 	QLabel *graphicsState_ = nullptr;
 	QCheckBox *programOnly_ = nullptr;
-	std::array<TransitionRow, 12> transitions_; // one per bank slot
+	std::array<TransitionRow, 20> transitions_; // one per bank slot (cameras 1-16, then extras)
 	QLabel *intermissionScene_ = nullptr;
 	QLineEdit *intermissionLabel_ = nullptr;
 	QLineEdit *intermissionUrl_ = nullptr;

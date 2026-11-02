@@ -346,6 +346,18 @@ private:
 	}
 	bool programIs(int slot) { return !sceneUuid(slot).empty() && programUuid() == sceneUuid(slot); }
 
+	// The scenes of the bank in use: the configured cameras, then the four extra scenes.
+	std::vector<int> bankSlots()
+	{
+		std::vector<int> v;
+		for (int i = 0; i < ctl()->config().cameraCount; i++)
+			v.push_back(i);
+		for (int i = kMaxCameras; i < kSlotCount; i++)
+			v.push_back(i);
+		return v;
+	}
+	int bankSceneCount() { return (int)bankSlots().size(); }
+
 	int countOwnedScenes()
 	{
 		int n = 0;
@@ -401,7 +413,7 @@ private:
 	std::string structureFingerprint()
 	{
 		std::string fp;
-		for (int i = 0; i < kSlotCount; i++) {
+		for (int i : bankSlots()) {
 			OBSSourceAutoRelease s = ctl()->bank().slotScene(i);
 			fp += uuidOf(s) + "[";
 			for (auto *item : sceneItems(obs_scene_from_source(s)))
@@ -539,18 +551,19 @@ private:
 			connectMediaCounters();
 		});
 
-		add("C01 twelve production scenes", [this]() {
+		add("C01 bank scenes", [this]() {
 			int owned = countOwnedScenes();
 			bool names = true;
 			QString list;
-			for (int i = 0; i < kSlotCount; i++) {
+			for (int i : bankSlots()) {
 				OBSSourceAutoRelease s = ctl()->bank().slotScene(i);
 				names = names && s;
 				list += QString::fromStdString(nameOf(s)) + "; ";
 			}
 			check("C01",
-			      "Exactly twelve plugin-owned scenes (8 cameras, Replay, Highlights, Intermission, Video Ads)",
-			      owned == kSlotCount && names, QString("owned=%1: %2").arg(owned).arg(list));
+			      "Exactly one plugin-owned scene per camera in use (8) plus Replay, Highlights, Intermission, "
+			      "Video Ads",
+			      owned == bankSceneCount() && names, QString("owned=%1: %2").arg(owned).arg(list));
 			OBSSourceAutoRelease s5 = ctl()->bank().slotScene(4);
 			bool collisionHandled = nameOf(s5) == "MF — CAM 05 (2)";
 			bool warned = false;
@@ -586,7 +599,7 @@ private:
 			      ok, detail);
 			check("C02",
 			      "One graphics source instance shared by all eight camera scenes; no graphics helper scene",
-			      g && graphicsOutsideCameraScenes(g) == 0 && countOwnedScenes() == kSlotCount,
+			      g && graphicsOutsideCameraScenes(g) == 0 && countOwnedScenes() == bankSceneCount(),
 			      QString("graphics source '%1' (%2)")
 				      .arg(QString::fromStdString(nameOf(g)), graphicsSourceTypeId()));
 
@@ -693,7 +706,7 @@ private:
 			obs_sceneitem_get_pos(c2, &p2);
 			check("C06", "Re-running Create / Repair creates no duplicates and preserves manual transforms",
 			      before == after && fp1 == fp3 && b.created == 0 && c.created == 0 &&
-				      countOwnedScenes() == kSlotCount && preserved,
+				      countOwnedScenes() == bankSceneCount() && preserved,
 			      QString("sources %1->%2, created on reruns %3/%4/%5, transform kept=%6")
 				      .arg(before)
 				      .arg(after)
@@ -1469,7 +1482,7 @@ private:
 			QApplication::processEvents();
 			w->surface()->purgeGraveyard();
 			int showing = 0;
-			for (int i = 0; i < kSlotCount; i++) {
+			for (int i : bankSlots()) {
 				if (sceneUuid(i) == previewUuid() || sceneUuid(i) == programUuid())
 					continue;
 				OBSSourceAutoRelease s = ctl()->bank().slotScene(i);
@@ -1512,7 +1525,8 @@ private:
 			check("C33b",
 			      "Repair recreates the deleted scene with a new identity; Return Live still refuses the "
 			      "old identity",
-			      recreated && r.created > 0 && !sv.returnLiveEnabled && countOwnedScenes() == kSlotCount,
+			      recreated && r.created > 0 && !sv.returnLiveEnabled &&
+				      countOwnedScenes() == bankSceneCount(),
 			      QString::fromStdString(sv.returnLiveReason));
 			check("C34", "Create / Repair never switches Program", programIs(kSlotReplay));
 		});
@@ -1771,6 +1785,72 @@ private:
 			ctl()->setPlaybackProvider(true);
 		});
 		sleep(1500); // let the multiview draw Replay Cue tiles for the screenshot
+
+		// ---- Number of cameras (4-16)
+		add("N01 twelve cameras", [this, cams]() {
+			ctl()->setCameraCount(12);
+			RepairReport r = ctl()->createOrRepair();
+			QString m;
+			bool assigned = ctl()->assignInput(11, (*cams)[1], &m);
+			QApplication::processEvents();
+			const Layout &l = ctl()->window()->surface()->logicalLayout();
+			OBSSourceAutoRelease s12 = ctl()->bank().slotScene(11);
+			check("N01",
+			      "12 cameras: Create / Repair adds CAM 09-12 (16 scenes), camera 12 gets a tile and camera 13 "
+			      "none",
+			      countOwnedScenes() == 16 && bankSceneCount() == 16 && s12 &&
+				      nameOf(s12) == "MF — CAM 12" && assigned &&
+				      !l.panes[kPaneCam1 + 11].outer.empty() && l.panes[kPaneCam1 + 12].outer.empty(),
+			      QString("owned=%1 created=%2 cam12 '%3'")
+				      .arg(countOwnedScenes())
+				      .arg(r.created)
+				      .arg(QString::fromStdString(nameOf(s12))));
+		});
+		add(
+			"N02 key R takes camera 12",
+			[this]() {
+				ctl()->window()->activateWindow();
+				sendKey(Qt::Key_R, false, "r");
+				n02Preview_ = previewUuid() == sceneUuid(11);
+				ctl()->cut();
+			},
+			[this]() { return programIs(11) && !ctl()->switcher().takeState().busy(); }, 4000);
+		add("N02 verify", [this]() {
+			SwitchView sv = ctl()->switcher().view();
+			check("N02", "Key R puts camera 12 in Preview; CUT takes it; it becomes the Return Live camera",
+			      n02Preview_ && programIs(11) && sv.lastCameraSlot == 11);
+		});
+		add("N03 sixteen cameras", [this]() {
+			ctl()->setCameraCount(16);
+			QApplication::processEvents();
+			const Layout &l = ctl()->window()->surface()->logicalLayout();
+			bool allTiles = true;
+			for (int p = 0; p < kPaneCount; p++)
+				allTiles = allTiles && !l.panes[p].outer.empty();
+			SlotFacts f16 = ctl()->switcher().slotFacts(15);
+			check("N03",
+			      "16 cameras: every tile is laid out; camera 16 shows NO SCENE until Create / Repair",
+			      allTiles && f16.inUse && !f16.sceneExists,
+			      QString("preview monitor %1 px wide, camera tile %2 px")
+				      .arg(l.panes[kPanePreview].video.w)
+				      .arg(l.panes[kPaneCam1].video.w));
+		});
+		add("N04 back to four cameras", [this]() {
+			ctl()->setCameraCount(4);
+			QApplication::processEvents();
+			bool sel5 = ctl()->selectSlot(4);
+			QString msg = ctl()->lastMessage();
+			SwitchView sv = ctl()->switcher().view();
+			const Layout &l = ctl()->window()->surface()->logicalLayout();
+			check("N04",
+			      "4 cameras: cameras 5-16 are hidden and cannot be selected, nothing is deleted, Return Live "
+			      "will not go to hidden camera 12",
+			      !sel5 && msg.contains("not in use") && countOwnedScenes() == 16 &&
+				      l.panes[kPaneCam1 + 4].outer.empty() && !l.panes[kPaneCam1 + 3].outer.empty() &&
+				      !sv.returnLiveEnabled,
+			      msg);
+			ctl()->setCameraCount(8);
+		});
 	}
 
 	void buildPhase2()
@@ -1786,7 +1866,7 @@ private:
 			}
 			OBSSourceAutoRelease s3 = ctl()->bank().slotScene(2);
 			check("P01", "After restart: twelve owned scenes and all camera assignments resolve by UUID",
-			      owned == kSlotCount && inputs, QString("owned=%1").arg(owned));
+			      owned == bankSceneCount() && inputs, QString("owned=%1").arg(owned));
 			check("P02", "After restart: renamed scene keeps its slot", nameOf(s3) == "Renamed Left Goal");
 			check("P03", "After restart: labels, graphics URL and playback files restored",
 			      c.cameras[0].label == "Main Wide" && !c.graphicsUrl.empty() &&
@@ -1844,7 +1924,7 @@ private:
 		add("P07 verify", [this]() {
 			bool sel = ctl()->selectSlot(1);
 			check("P07", "Switching back restores the original bank and switching works",
-			      countOwnedScenes() == kSlotCount && sceneUuid(0) == bankScene0_ && sel &&
+			      countOwnedScenes() == bankSceneCount() && sceneUuid(0) == bankScene0_ && sel &&
 				      previewUuid() == sceneUuid(1));
 		});
 		waitFor(
@@ -1874,7 +1954,7 @@ private:
 	int startCount_ = 0;
 	int64_t cutStart_ = 0;
 	std::string takeLabel_;
-	bool sawTransition_ = false, takeAccepted_ = false;
+	bool sawTransition_ = false, takeAccepted_ = false, n02Preview_ = false;
 	int sceneChangedBefore_ = 0, programChanges_ = 0, repeatAccepted_ = 0, repeatDropped_ = 0;
 	std::string lastProgramSeen_;
 	bool replayLoadOk_ = false, highlightsLoadOk_ = false;

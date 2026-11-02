@@ -23,7 +23,7 @@
 
 namespace mf {
 
-constexpr int kHotkeyCount = 14; // OBS hotkeys registered by the plugin
+constexpr int kHotkeyCount = 22; // OBS hotkeys registered by the plugin
 
 class Controller : public QObject {
 	Q_OBJECT
@@ -48,6 +48,9 @@ public:
 	bool toggleGraphics();
 	bool enableStudioMode();
 	bool loadPlayback(int slot, const QString &path);
+	// Number of cameras in the multiview (4..16). Raising it needs Create / Repair to add
+	// the new camera scenes; lowering it hides cameras but deletes nothing.
+	void setCameraCount(int count);
 	bool loadAdsPlaylist(const QStringList &files);
 	bool applyIntermissionUrl(const QString &url, QString *message);
 	// The transition used when this slot's scene is taken to Program ("" = Cut).

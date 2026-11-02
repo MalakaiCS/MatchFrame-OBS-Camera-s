@@ -10,16 +10,20 @@
 
 namespace mf {
 
-constexpr int kCameraCount = 8;
-constexpr int kSlotReplay = 8;        // bank slot index 8
-constexpr int kSlotHighlights = 9;    // bank slot index 9
-constexpr int kSlotIntermission = 10; // graphics page (Browser Source), no media
-constexpr int kSlotAds = 11;          // video ads playlist
-constexpr int kSlotCount = 12;
+// Bank slots: cameras 0..15 (the operator uses the first 4..16 of them), then the four
+// extra scenes. Slot numbers are internal; nothing persists them.
+constexpr int kMaxCameras = 16;
+constexpr int kMinCameras = 4;
+constexpr int kDefaultCameras = 8;
+constexpr int kSlotReplay = 16;
+constexpr int kSlotHighlights = 17;
+constexpr int kSlotIntermission = 18; // graphics page (Browser Source), no media
+constexpr int kSlotAds = 19;          // video ads playlist
+constexpr int kSlotCount = 20;
 
 inline bool slotIsCamera(int slot)
 {
-	return slot >= 0 && slot < kCameraCount;
+	return slot >= 0 && slot < kMaxCameras;
 }
 // Slots that play prepared media (armed paused, started on Program entry).
 inline bool slotIsPlayback(int slot)
@@ -38,6 +42,7 @@ inline bool slotIsIntermission(int slot)
 
 // Facts about one bank slot, resolved immediately before a decision.
 struct SlotFacts {
+	bool inUse = true;          // camera: within the configured number of cameras
 	bool sceneExists = false;   // plugin-owned scene resolved by identity
 	bool inputAssigned = false; // camera: an input is configured for the slot
 	bool inputExists = false;   // camera: the configured input still exists
@@ -57,6 +62,7 @@ enum class Reject {
 	InputMissing,
 	PlaybackNotReady,
 	NoCutTransition,
+	CameraNotInUse,   // camera slot beyond the configured number of cameras
 	NoTarget,         // Return Live: no last camera recorded / it no longer exists
 	AlreadyOnProgram, // Return Live target already on Program
 };

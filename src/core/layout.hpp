@@ -15,12 +15,12 @@ struct Rect {
 enum PaneIndex : int {
 	kPanePreview = 0,
 	kPaneProgram = 1,
-	kPaneCam1 = 2, // cameras 1..8 occupy 2..9
-	kPaneReplay = 10,
-	kPaneHighlights = 11,
-	kPaneIntermission = 12,
-	kPaneAds = 13,
-	kPaneCount = 14,
+	kPaneCam1 = 2, // cameras 1..16 occupy 2..17 (unused cameras get an empty rect)
+	kPaneReplay = 18,
+	kPaneHighlights = 19,
+	kPaneIntermission = 20,
+	kPaneAds = 21,
+	kPaneCount = 22,
 };
 
 inline int paneForCamera(int camIndex0)
@@ -29,7 +29,13 @@ inline int paneForCamera(int camIndex0)
 }
 inline bool paneIsCamera(int pane)
 {
-	return pane >= kPaneCam1 && pane < kPaneCam1 + 8;
+	return pane >= kPaneCam1 && pane < kPaneCam1 + 16;
+}
+
+// True when the pane is shown for this many cameras (camera panes beyond it stay empty).
+inline bool paneInUse(int pane, int cameraCount)
+{
+	return !paneIsCamera(pane) || pane - kPaneCam1 < cameraCount;
 }
 
 struct PaneGeometry {
@@ -40,8 +46,8 @@ struct PaneGeometry {
 
 enum class LayoutMode {
 	Auto,    // pick the arrangement that gives the largest monitors for the window size
-	Stacked, // monitors / cameras 1-4 / cameras 5-8 / compact Replay, Highlights, Intermission, Ads row
-	Wide,    // monitors / cameras 1-4 + Replay + Intermission / cameras 5-8 + Highlights + Ads
+	Stacked, // monitors / camera rows / compact Replay, Highlights, Intermission, Ads row
+	Wide,    // monitors / camera rows, Replay + Intermission and Highlights + Ads at the ends
 };
 
 struct LayoutInput {
@@ -51,6 +57,7 @@ struct LayoutInput {
 	double spacing = 8;          // gap between panes and around the edge
 	double labelHeight = 22;     // label strip height under each pane
 	double playbackScale = 0.75; // playback row tiles relative to camera tiles ("compact row")
+	int cameraCount = 8;         // cameras in use (4..16); the other camera panes are left empty
 	LayoutMode mode = LayoutMode::Auto;
 };
 
@@ -60,11 +67,12 @@ struct Layout {
 	bool valid = false;
 };
 
-// Computes the 14-pane multiview layout with [Preview | Program] on top and the twelve
-// scene tiles below, either stacked (two camera rows + a compact row of Replay,
-// Highlights, Intermission and Video Ads) or wide (those four at the ends of the camera
-// rows). Auto picks whichever fits the window best. All fourteen panes are always laid
-// out (they shrink rather than disappear).
+// Computes the multiview layout with [Preview | Program] on top and the scene tiles below:
+// the cameras in use (4..16) plus Replay, Highlights, Intermission and Video Ads. Stacked
+// puts the cameras in rows with a compact row of the four extra scenes underneath; Wide
+// puts the extras at the ends of the first two camera rows. Several row counts are tried
+// and Auto picks whichever gives the largest monitors for the window. Every pane in use is
+// always laid out (panes shrink rather than disappear); unused camera panes stay empty.
 Layout computeLayout(const LayoutInput &in);
 
 // Returns the pane index under (x, y) or -1. Coordinates use the same unit as the layout.

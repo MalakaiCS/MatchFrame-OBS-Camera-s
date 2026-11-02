@@ -13,6 +13,7 @@ SlotFacts SwitchController::slotFacts(int slot)
 	OBSSourceAutoRelease scene = bank_.slotScene(slot);
 	f.sceneExists = scene != nullptr;
 	if (slotIsCamera(slot)) {
+		f.inUse = bank_.config().cameraInUse(slot);
 		const CameraSlotConfig &c = bank_.config().cameras[slot];
 		f.inputAssigned = !c.inputUuid.empty() || !c.inputName.empty();
 		OBSSourceAutoRelease input = bank_.cameraInput(slot);
@@ -135,7 +136,7 @@ ReturnLiveFacts SwitchController::returnLiveFacts(OBSSourceAutoRelease &target)
 	if (f.targetKnown && slotIsCamera(slot)) {
 		target = bank_.slotScene(slot);
 		// The scene must still be the same object (identity), not a re-created namesake.
-		f.targetExists = target && uuidOf(target) == id;
+		f.targetExists = target && uuidOf(target) == id && bank_.config().cameraInUse(slot);
 		OBSSourceAutoRelease input = bank_.cameraInput(slot);
 		f.targetInputExists = input != nullptr;
 		OBSSourceAutoRelease program = obs_frontend_get_current_scene();

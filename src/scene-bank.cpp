@@ -78,7 +78,7 @@ static std::string graphicsBaseName(int slot)
 
 static std::string &sceneUuidRef(BankConfig &c, int slot)
 {
-	return slot < 8 ? c.cameras[slot].sceneUuid : c.playback(slot).sceneUuid;
+	return slotIsCamera(slot) ? c.cameras[slot].sceneUuid : c.playback(slot).sceneUuid;
 }
 
 OBSSourceAutoRelease SceneBank::slotScene(int slot) const
@@ -100,7 +100,7 @@ OBSSourceAutoRelease SceneBank::slotScene(int slot) const
 
 OBSSourceAutoRelease SceneBank::cameraInput(int cam)
 {
-	if (cam < 0 || cam >= 8)
+	if (cam < 0 || cam >= kMaxCameras)
 		return nullptr;
 	CameraSlotConfig &c = cfg_.cameras[cam];
 	if (c.inputUuid.empty() && c.inputName.empty())
@@ -169,7 +169,7 @@ int SceneBank::slotOfSceneUuid(const std::string &uuid) const
 {
 	if (uuid.empty())
 		return -1;
-	for (int i = 0; i < 8; i++)
+	for (int i = 0; i < kMaxCameras; i++)
 		if (cfg_.cameras[i].sceneUuid == uuid)
 			return i;
 	if (cfg_.replay.sceneUuid == uuid)
@@ -308,7 +308,7 @@ OBSSourceAutoRelease SceneBank::resolveOrCreateScene(int slot, RepairReport &r)
 		r.reused++;
 		return src;
 	}
-	const std::string base = slot < 8 ? defaultCameraSceneName(slot) : defaultPlaybackSceneName(slot);
+	const std::string base = slotIsCamera(slot) ? defaultCameraSceneName(slot) : defaultPlaybackSceneName(slot);
 	const std::string name = uniqueSourceName(base);
 	if (name != base)
 		r.warn("'" + base + "' is used by an unrelated object; created '" + name + "' instead");
@@ -316,7 +316,7 @@ OBSSourceAutoRelease SceneBank::resolveOrCreateScene(int slot, RepairReport &r)
 	obs_source_t *s = obs_scene_get_source(scene);
 	markOwned(s, cfg_.bankId, sceneRole(slot));
 	uuid = uuidOf(s);
-	if (slot < 8)
+	if (slotIsCamera(slot))
 		cfg_.cameras[slot].sceneName = name;
 	else
 		cfg_.playback(slot).sceneName = name;
@@ -590,7 +590,7 @@ RepairReport SceneBank::createOrRepair()
 		       "video-only switching and playback still work");
 	}
 
-	for (int cam = 0; cam < 8; cam++)
+	for (int cam = 0; cam < cfg_.cameraCount; cam++)
 		repairCameraScene(cam, browser, r);
 	repairPlaybackScene(kSlotReplay, r);
 	repairPlaybackScene(kSlotHighlights, r);
@@ -608,7 +608,7 @@ RepairReport SceneBank::createOrRepair()
 
 bool SceneBank::assignInput(int cam, const std::string &inputUuid, std::string *message)
 {
-	if (cam < 0 || cam >= 8)
+	if (cam < 0 || cam >= kMaxCameras)
 		return false;
 	CameraSlotConfig &c = cfg_.cameras[cam];
 	OBSSourceAutoRelease input;
@@ -700,7 +700,7 @@ std::vector<int> SceneBank::slotsSharingInput(int cam) const
 	const std::string &u = cfg_.cameras[cam].inputUuid;
 	if (u.empty())
 		return out;
-	for (int i = 0; i < 8; i++)
+	for (int i = 0; i < cfg_.cameraCount; i++)
 		if (i != cam && cfg_.cameras[i].inputUuid == u)
 			out.push_back(i);
 	return out;
@@ -712,12 +712,12 @@ void SceneBank::refreshNames()
 		OBSSourceAutoRelease s = slotScene(i);
 		if (!s)
 			continue;
-		if (i < 8)
+		if (slotIsCamera(i))
 			cfg_.cameras[i].sceneName = nameOf(s);
 		else
 			cfg_.playback(i).sceneName = nameOf(s);
 	}
-	for (int i = 0; i < 8; i++) {
+	for (int i = 0; i < kMaxCameras; i++) {
 		OBSSourceAutoRelease in = cameraInput(i);
 		if (in)
 			cfg_.cameras[i].inputName = nameOf(in);

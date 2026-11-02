@@ -87,3 +87,9 @@ FPS at the top of your results.
 - [ ] (auto) Load two or more ads → READY on ad 1; `=` then CUT → they play in order; after the last: ENDED, no
       auto-switch; Return Live → re-armed at ad 1.
 - [ ] Ad audio is heard only while Video Ads is on Program.
+
+## Number of cameras
+- [ ] (auto) Setup → Number of cameras 12 → Create / Repair adds CAM 09-12; the multiview shows 12 camera tiles.
+- [ ] (auto) Key R previews camera 12; CUT takes it.
+- [ ] (auto) 16 → every tile laid out; 4 → cameras 5-16 hidden, not selectable, scenes kept.
+- [ ] On the real monitor at 12 and 16 cameras: tiles readable, labels legible, Full Screen fills the screen.

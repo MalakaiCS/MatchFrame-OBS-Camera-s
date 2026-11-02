@@ -27,6 +27,8 @@ const char *rejectMessage(Reject r)
 		return "Playback is not READY - load and arm a file first";
 	case Reject::NoCutTransition:
 		return "OBS has no Cut transition available";
+	case Reject::CameraNotInUse:
+		return "This camera is not in use - raise the number of cameras in Setup";
 	case Reject::NoTarget:
 		return "No valid last live camera to return to";
 	case Reject::AlreadyOnProgram:
@@ -37,6 +39,8 @@ const char *rejectMessage(Reject r)
 
 static Reject checkSlot(int slot, const SlotFacts &s, bool forTake)
 {
+	if (slotIsCamera(slot) && !s.inUse)
+		return Reject::CameraNotInUse;
 	if (!s.sceneExists)
 		return Reject::SceneMissing;
 	if (slotIsCamera(slot)) {

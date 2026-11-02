@@ -70,7 +70,7 @@ QString Controller::slotLabel(int slot) const
 {
 	if (slotIsCamera(slot))
 		return QString::fromStdString(cfg_.cameras[slot].label);
-	if (slot >= kCameraCount && slot < kSlotCount)
+	if (!slotIsCamera(slot) && slot >= 0 && slot < kSlotCount)
 		return QString::fromStdString(cfg_.playback(slot).label);
 	return QString();
 }
@@ -79,7 +79,7 @@ void Controller::setSlotLabel(int slot, const QString &label)
 {
 	if (slotIsCamera(slot))
 		cfg_.cameras[slot].label = label.toStdString();
-	else if (slot >= kCameraCount && slot < kSlotCount)
+	else if (!slotIsCamera(slot) && slot >= 0 && slot < kSlotCount)
 		cfg_.playback(slot).label = label.toStdString();
 	emit stateChanged();
 }
@@ -173,6 +173,36 @@ bool Controller::loadPlayback(int slot, const QString &path)
 		setMessage(QString("%1: %2").arg(slotLabel(slot), QString::fromStdString(msg)), true);
 	emit stateChanged();
 	return ok;
+}
+
+void Controller::setCameraCount(int count)
+{
+	count = clampCameraCount(count);
+	if (count == cfg_.cameraCount)
+		return;
+	const int before = cfg_.cameraCount;
+	cfg_.cameraCount = count;
+	obs_log(LOG_INFO, "cameras in the multiview: %d (was %d)", count, before);
+	int missing = 0;
+	for (int cam = before; cam < count; cam++) {
+		OBSSourceAutoRelease s = bank_.slotScene(cam);
+		missing += s ? 0 : 1;
+	}
+	if (missing > 0)
+		setMessage(QString("%1 cameras - press Create / Repair to add the scenes for cameras %2-%3")
+				   .arg(count)
+				   .arg(before + 1)
+				   .arg(count),
+			   false);
+	else if (count < before)
+		setMessage(QString("%1 cameras - cameras %2-%3 are hidden (their scenes are kept)")
+				   .arg(count)
+				   .arg(count + 1)
+				   .arg(before),
+			   false);
+	else
+		setMessage(QString("%1 cameras").arg(count), false);
+	emit stateChanged();
 }
 
 bool Controller::loadAdsPlaylist(const QStringList &files)
@@ -711,6 +741,14 @@ const HotkeyDef kHotkeys[kHotkeyCount] = {
 	{"MatchFrame.ReturnLive", "MatchFrame: Return Live (cut to last camera)", kActionReturnLive},
 	{"MatchFrame.PreviewIntermission", "MatchFrame: Preview Intermission", kSlotIntermission},
 	{"MatchFrame.PreviewAds", "MatchFrame: Preview Video Ads", kSlotAds},
+	{"MatchFrame.PreviewCam9", "MatchFrame: Preview Camera 9", 8},
+	{"MatchFrame.PreviewCam10", "MatchFrame: Preview Camera 10", 9},
+	{"MatchFrame.PreviewCam11", "MatchFrame: Preview Camera 11", 10},
+	{"MatchFrame.PreviewCam12", "MatchFrame: Preview Camera 12", 11},
+	{"MatchFrame.PreviewCam13", "MatchFrame: Preview Camera 13", 12},
+	{"MatchFrame.PreviewCam14", "MatchFrame: Preview Camera 14", 13},
+	{"MatchFrame.PreviewCam15", "MatchFrame: Preview Camera 15", 14},
+	{"MatchFrame.PreviewCam16", "MatchFrame: Preview Camera 16", 15},
 };
 
 void hotkeyCallback(void *data, obs_hotkey_id, obs_hotkey_t *, bool pressed)

@@ -266,13 +266,15 @@ static std::string paneSignature(const PaneSpec &p)
 	return std::string(buf) + p.title.toStdString() + "|" + p.status.toStdString();
 }
 
-void RenderSurface::setPanes(std::array<PaneSpec, kPaneCount> &&panes)
+void RenderSurface::setPanes(std::array<PaneSpec, kPaneCount> &&panes, int cameraCount)
 {
+	const bool countChanged = cameraCount != cameraCount_;
+	cameraCount_ = cameraCount;
 	bool changed = !snapshot_;
 	for (int i = 0; i < kPaneCount && !changed; i++)
 		changed = paneSignature(panes[i]) != paneSignature(panes_[i]);
 	panes_ = std::move(panes);
-	if (changed)
+	if (changed || countChanged)
 		rebuild();
 	purgeGraveyard();
 }
@@ -398,6 +400,7 @@ void RenderSurface::rebuild()
 	LayoutInput in;
 	in.width = ps.width();
 	in.height = ps.height();
+	in.cameraCount = cameraCount_;
 	in.canvasAspect = snap->canvasH ? (double)snap->canvasW / snap->canvasH : 16.0 / 9.0;
 	in.spacing = 6 * dpr;
 	in.labelHeight = std::round(22 * dpr);
@@ -413,6 +416,8 @@ void RenderSurface::rebuild()
 	std::unordered_set<obs_source_t *> unique;
 	for (int i = 0; i < kPaneCount; i++) {
 		const PaneSpec &spec = panes_[i];
+		if (!paneInUse(i, cameraCount_))
+			continue; // not shown: hold no reference, keep it from "showing"
 		if (spec.source) {
 			snap->sources[i] = obs_source_get_ref(spec.source);
 			if (snap->sources[i])
@@ -524,6 +529,8 @@ void RenderSurface::drawInternal(uint32_t cx, uint32_t cy)
 
 	for (int i = 0; i < kPaneCount; i++) {
 		const PaneGeometry &g = snap->layout.panes[i];
+		if (g.outer.empty())
+			continue; // camera beyond the configured number
 		const Rect area = scaled(g.video);
 		drawRect(solid, color, area.x, area.y, area.w, area.h, 0xFF000000);
 

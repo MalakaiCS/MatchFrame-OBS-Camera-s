@@ -65,11 +65,29 @@ void SetupDialog::build()
 	// --- Cameras
 	auto *camBox = new QGroupBox(
 		"Camera scenes (assign existing OBS inputs; create inputs with OBS's normal Sources workflow)", this);
-	auto *grid = new QGridLayout(camBox);
+	auto *camOuter = new QVBoxLayout(camBox);
+	auto *countRow = new QHBoxLayout;
+	cameraCount_ = new QSpinBox;
+	cameraCount_->setRange(kMinCameras, kMaxCameras);
+	cameraCount_->setToolTip("How many camera tiles the multiview shows (4-16). New cameras need Create / Repair; "
+				 "fewer cameras hides the rest without deleting their scenes.");
+	countRow->addWidget(new QLabel("<b>Number of cameras:</b>"));
+	countRow->addWidget(cameraCount_);
+	countRow->addWidget(new QLabel("(keys 1-8 for cameras 1-8, Q W E R T Y U I for cameras 9-16)"), 1);
+	camOuter->addLayout(countRow);
+	connect(cameraCount_, &QSpinBox::valueChanged, this, [this](int n) {
+		if (loading_)
+			return;
+		controller_->setCameraCount(n);
+		showCameraRows();
+		refreshStatus();
+	});
+	auto *grid = new QGridLayout;
+	camOuter->addLayout(grid);
 	const char *headers[] = {"Slot", "Label", "Input", "Scene", "", "Framing"};
 	for (int c = 0; c < 6; c++)
 		grid->addWidget(new QLabel(QString("<b>%1</b>").arg(headers[c])), 0, c);
-	for (int i = 0; i < 8; i++) {
+	for (int i = 0; i < (int)cams_.size(); i++) {
 		CamRow &r = cams_[i];
 		r.slot = new QLabel(QString("CAM %1").arg(i + 1));
 		r.label = new QLineEdit;
@@ -84,7 +102,9 @@ void SetupDialog::build()
 			"Scale the camera to fit the canvas (letterbox). Resets position/scale of this camera item.");
 		r.fill->setToolTip(
 			"Scale the camera to fill the canvas (crop overflow). Resets position/scale of this camera item.");
-		auto *fr = new QHBoxLayout;
+		r.framing = new QWidget;
+		auto *fr = new QHBoxLayout(r.framing);
+		fr->setContentsMargins(0, 0, 0, 0);
 		fr->addWidget(r.fit);
 		fr->addWidget(r.fill);
 		grid->addWidget(r.slot, i + 1, 0);
@@ -92,7 +112,7 @@ void SetupDialog::build()
 		grid->addWidget(r.input, i + 1, 2);
 		grid->addWidget(r.scene, i + 1, 3);
 		grid->addWidget(r.warning, i + 1, 4);
-		grid->addLayout(fr, i + 1, 5);
+		grid->addWidget(r.framing, i + 1, 5);
 
 		connect(r.label, &QLineEdit::editingFinished, this,
 			[this, i]() { controller_->setSlotLabel(i, cams_[i].label->text().trimmed()); });
@@ -121,8 +141,8 @@ void SetupDialog::build()
 	root->addWidget(camBox);
 
 	// --- Camera graphics
-	auto *gBox = new QGroupBox("Camera graphics (one shared Browser Source referenced in all eight camera scenes)",
-				   this);
+	auto *gBox =
+		new QGroupBox("Camera graphics (one shared Browser Source referenced in every camera scene)", this);
 	auto *gl = new QGridLayout(gBox);
 	graphicsUrl_ = new QLineEdit;
 	graphicsUrl_->setEchoMode(QLineEdit::Password); // URLs may carry access tokens
@@ -317,15 +337,16 @@ void SetupDialog::build()
 	auto *tBox = new QGroupBox("Transitions (used when each scene is taken to Program: CUT, Return Live, and "
 				   "OBS's own Transition button). Default: Cut",
 				   this);
+	// Two columns of rows: the cameras in use, then Replay, Highlights, Intermission, Video Ads.
 	auto *tl = new QGridLayout(tBox);
-	for (int half = 0; half < 2; half++) {
-		tl->addWidget(new QLabel("<b>Scene</b>"), 0, half * 4);
-		tl->addWidget(new QLabel("<b>Transition</b>"), 0, half * 4 + 1);
-		tl->addWidget(new QLabel("<b>Duration</b>"), 0, half * 4 + 2);
-	}
+	tl->setHorizontalSpacing(24);
 	for (int slot = 0; slot < (int)transitions_.size(); slot++) {
 		TransitionRow &t = transitions_[(size_t)slot];
+		t.cell = new QWidget;
+		auto *h = new QHBoxLayout(t.cell);
+		h->setContentsMargins(0, 0, 0, 0);
 		t.name = new QLabel;
+		t.name->setMinimumWidth(170);
 		t.transition = new QComboBox;
 		t.transition->setMinimumWidth(150);
 		t.duration = new QSpinBox;
@@ -333,14 +354,13 @@ void SetupDialog::build()
 		t.duration->setSingleStep(50);
 		t.duration->setSuffix(" ms");
 		t.duration->setKeyboardTracking(false); // apply once the value is entered, not per digit
-		const int half = slot < 6 ? 0 : 1, row = slot % 6 + 1;
-		tl->addWidget(t.name, row, half * 4);
-		tl->addWidget(t.transition, row, half * 4 + 1);
-		tl->addWidget(t.duration, row, half * 4 + 2);
+		h->addWidget(t.name);
+		h->addWidget(t.transition, 1);
+		h->addWidget(t.duration);
+		tl->addWidget(t.cell, slot / 2, slot % 2);
 		connect(t.transition, &QComboBox::currentIndexChanged, this, [this, slot]() { applyTransition(slot); });
 		connect(t.duration, &QSpinBox::valueChanged, this, [this, slot]() { applyTransition(slot); });
 	}
-	tl->setColumnMinimumWidth(3, 24);
 	root->addWidget(tBox);
 
 	// --- Repair
@@ -372,7 +392,7 @@ void SetupDialog::reload()
 	loading_ = true;
 	BankConfig &cfg = controller_->config();
 	auto inputs = controller_->bank().videoInputs();
-	for (int i = 0; i < 8; i++) {
+	for (int i = 0; i < (int)cams_.size(); i++) {
 		CamRow &r = cams_[i];
 		r.label->setText(QString::fromStdString(cfg.cameras[i].label));
 		r.input->clear();
@@ -391,7 +411,12 @@ void SetupDialog::reload()
 		r.input->setCurrentIndex(sel);
 	}
 	graphicsUrl_->setText(QString::fromStdString(cfg.graphicsUrl));
+	{
+		QSignalBlocker block(cameraCount_);
+		cameraCount_->setValue(cfg.cameraCount);
+	}
 	reloadTransitions();
+	showCameraRows();
 	intermissionLabel_->setText(QString::fromStdString(cfg.intermission.label));
 	intermissionUrl_->setText(QString::fromStdString(cfg.intermission.graphicsUrl));
 	{
@@ -431,7 +456,7 @@ void SetupDialog::refreshStatus()
 {
 	BankConfig &cfg = controller_->config();
 	SceneBank &bank = controller_->bank();
-	for (int i = 0; i < 8; i++) {
+	for (int i = 0; i < (int)cams_.size(); i++) {
 		CamRow &r = cams_[i];
 		OBSSourceAutoRelease scene = bank.slotScene(i);
 		r.scene->setText(scene ? QString::fromStdString(nameOf(scene)) : "<i>not created</i>");
@@ -544,9 +569,9 @@ void SetupDialog::reloadTransitions()
 	for (int slot = 0; slot < (int)transitions_.size(); slot++) {
 		TransitionRow &t = transitions_[(size_t)slot];
 		QSignalBlocker b1(t.transition), b2(t.duration);
-		const QString label = slot < 8 ? QString("%1 · %2").arg(slot + 1).arg(
-							 QString::fromStdString(cfg.cameras[(size_t)slot].label))
-					       : QString::fromStdString(cfg.playback(slot).label);
+		const QString label = slotIsCamera(slot) ? QString("%1 · %2").arg(slot + 1).arg(QString::fromStdString(
+								   cfg.cameras[(size_t)slot].label))
+							 : QString::fromStdString(cfg.playback(slot).label);
 		t.name->setText(label.toHtmlEscaped());
 		OBSSourceAutoRelease scene = controller_->bank().slotScene(slot);
 		const std::string current = sceneTransitionOverride(scene);
@@ -574,6 +599,19 @@ void SetupDialog::reloadTransitions()
 		t.transition->setEnabled(scene != nullptr);
 		t.transition->setToolTip(scene ? "Used whenever this scene is taken to Program"
 					       : "Scene not created yet - run Create / Repair");
+	}
+}
+
+void SetupDialog::showCameraRows()
+{
+	const int n = controller_->config().cameraCount;
+	for (int i = 0; i < (int)cams_.size(); i++) {
+		CamRow &r = cams_[(size_t)i];
+		const bool on = i < n;
+		for (QWidget *w : {(QWidget *)r.slot, (QWidget *)r.label, (QWidget *)r.input, (QWidget *)r.scene,
+				   (QWidget *)r.warning, r.framing})
+			w->setVisible(on);
+		transitions_[(size_t)i].cell->setVisible(on);
 	}
 }
 

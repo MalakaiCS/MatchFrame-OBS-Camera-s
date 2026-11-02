@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.5.0 — 2026-11-02
+
+### Added
+- **4 to 16 cameras.** Setup → *Number of cameras* (default 8).
+  - The multiview, the camera rows in Setup and the Transitions list follow the number.
+  - Create / Repair adds the scenes `MF — CAM 09` … `MF — CAM 16` as needed.
+  - Lowering the number hides cameras without deleting their scenes.
+  - A hidden camera can't be selected, and Return Live won't go to it.
+- Keys **Q W E R T Y U I** preview cameras 9–16. There are new OBS hotkeys *Preview Camera
+  9–16*.
+- The multiview layout adapts to the camera count. It tries two, three or four camera rows
+  and keeps the one with the largest monitors. With 8 cameras it is unchanged.
+
 ## v1.4.0 — 2026-10-31
 
 ### Added
