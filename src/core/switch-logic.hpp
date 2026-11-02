@@ -10,16 +10,20 @@
 
 namespace mf {
 
-constexpr int kCameraCount = 8;
-constexpr int kSlotReplay = 8;        // bank slot index 8
-constexpr int kSlotHighlights = 9;    // bank slot index 9
-constexpr int kSlotIntermission = 10; // graphics page (Browser Source), no media
-constexpr int kSlotAds = 11;          // video ads playlist
-constexpr int kSlotCount = 12;
+// Bank slots: cameras 0..15 (the operator uses the first 4..16 of them), then the four
+// extra scenes. Slot numbers are internal; nothing persists them.
+constexpr int kMaxCameras = 16;
+constexpr int kMinCameras = 4;
+constexpr int kDefaultCameras = 8;
+constexpr int kSlotReplay = 16;
+constexpr int kSlotHighlights = 17;
+constexpr int kSlotIntermission = 18; // graphics page (Browser Source), no media
+constexpr int kSlotAds = 19;          // video ads playlist
+constexpr int kSlotCount = 20;
 
 inline bool slotIsCamera(int slot)
 {
-	return slot >= 0 && slot < kCameraCount;
+	return slot >= 0 && slot < kMaxCameras;
 }
 // Slots that play prepared media (armed paused, started on Program entry).
 inline bool slotIsPlayback(int slot)
@@ -38,6 +42,7 @@ inline bool slotIsIntermission(int slot)
 
 // Facts about one bank slot, resolved immediately before a decision.
 struct SlotFacts {
+	bool inUse = true;          // camera: within the configured number of cameras
 	bool sceneExists = false;   // plugin-owned scene resolved by identity
 	bool inputAssigned = false; // camera: an input is configured for the slot
 	bool inputExists = false;   // camera: the configured input still exists
@@ -56,8 +61,8 @@ enum class Reject {
 	Unassigned,
 	InputMissing,
 	PlaybackNotReady,
-	TransitionOverride, // per-scene override would turn CUT into something else
 	NoCutTransition,
+	CameraNotInUse,   // camera slot beyond the configured number of cameras
 	NoTarget,         // Return Live: no last camera recorded / it no longer exists
 	AlreadyOnProgram, // Return Live target already on Program
 };
@@ -88,8 +93,7 @@ struct CutFacts {
 	bool cutTransitionAvailable = false;
 	bool previewExists = false;
 	bool previewEqualsProgram = false;
-	bool previewOverrideConflict = false; // preview scene has a non-cut transition override
-	int previewSlot = -1;                 // bank slot of the Preview scene, -1 if outside the bank
+	int previewSlot = -1; // bank slot of the Preview scene, -1 if outside the bank
 	SlotFacts previewSlotFacts;
 };
 
@@ -114,7 +118,6 @@ struct ReturnLiveFacts {
 	bool targetExists = false;      // it still resolves to a plugin-owned camera scene
 	bool targetInputExists = false; // and that camera still has its input
 	bool targetOnProgram = false;
-	bool targetOverrideConflict = false;
 };
 
 CutDecision evaluateReturnLive(const ReturnLiveFacts &f);
@@ -139,6 +142,9 @@ public:
 	// Releases a stuck take after the timeout. Returns true if it timed out.
 	bool tick(int64_t nowMs);
 	void setDisabled(bool disabled);
+	// A take with a long transition (e.g. a 3 s fade) needs longer before it is released.
+	void setTimeoutMs(int64_t ms) { timeoutMs_ = ms; }
+	int64_t timeoutMs() const { return timeoutMs_; }
 
 	uint64_t dropped() const { return dropped_; }
 

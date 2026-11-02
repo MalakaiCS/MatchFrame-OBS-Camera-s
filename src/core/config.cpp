@@ -6,33 +6,40 @@
 
 namespace mf {
 
-static const char *kCamSceneNames[8] = {
-	"MF — CAM 01", "MF — CAM 02", "MF — CAM 03", "MF — CAM 04",
-	"MF — CAM 05", "MF — CAM 06", "MF — CAM 07", "MF — CAM 08",
+static const char *kCamSceneNames[kMaxCameras] = {
+	"MF — CAM 01", "MF — CAM 02", "MF — CAM 03", "MF — CAM 04", "MF — CAM 05", "MF — CAM 06",
+	"MF — CAM 07", "MF — CAM 08", "MF — CAM 09", "MF — CAM 10", "MF — CAM 11", "MF — CAM 12",
+	"MF — CAM 13", "MF — CAM 14", "MF — CAM 15", "MF — CAM 16",
 };
-static const char *kCamLabels[8] = {
-	"Main Wide", "Tight / Follow", "Left Goal",     "Right Goal",
-	"Sideline",  "Reverse Angle",  "Bench / Crowd", "Handheld / Spare",
+static const char *kCamLabels[kMaxCameras] = {
+	"Main Wide",     "Tight / Follow",   "Left Goal", "Right Goal", "Sideline",  "Reverse Angle",
+	"Bench / Crowd", "Handheld / Spare", "Camera 9",  "Camera 10",  "Camera 11", "Camera 12",
+	"Camera 13",     "Camera 14",        "Camera 15", "Camera 16",
 };
 
 const char *defaultCameraSceneName(int cam)
 {
-	return (cam >= 0 && cam < 8) ? kCamSceneNames[cam] : "MF — CAM";
+	return (cam >= 0 && cam < kMaxCameras) ? kCamSceneNames[cam] : "MF — CAM";
 }
 
 const char *defaultCameraLabel(int cam)
 {
-	return (cam >= 0 && cam < 8) ? kCamLabels[cam] : "";
+	return (cam >= 0 && cam < kMaxCameras) ? kCamLabels[cam] : "";
+}
+
+int clampCameraCount(int n)
+{
+	return n < kMinCameras ? kMinCameras : n > kMaxCameras ? kMaxCameras : n;
 }
 
 const char *defaultPlaybackSceneName(int slot)
 {
 	switch (slot) {
-	case 8:
+	case kSlotReplay:
 		return "MF — REPLAY";
-	case 10:
+	case kSlotIntermission:
 		return "MF — INTERMISSION";
-	case 11:
+	case kSlotAds:
 		return "MF — VIDEO ADS";
 	default:
 		return "MF — HIGHLIGHTS";
@@ -42,11 +49,11 @@ const char *defaultPlaybackSceneName(int slot)
 const char *defaultPlaybackLabel(int slot)
 {
 	switch (slot) {
-	case 8:
+	case kSlotReplay:
 		return "Replay";
-	case 10:
+	case kSlotIntermission:
 		return "Intermission";
-	case 11:
+	case kSlotAds:
 		return "Video Ads";
 	default:
 		return "Half-Time / Full-Time Highlights";
@@ -68,18 +75,18 @@ BankConfig makeDefaultConfig(const std::string &bankId)
 {
 	BankConfig c;
 	c.bankId = bankId;
-	for (int i = 0; i < 8; i++) {
+	for (int i = 0; i < kMaxCameras; i++) {
 		c.cameras[i].label = kCamLabels[i];
 		c.cameras[i].sceneName = kCamSceneNames[i];
 	}
-	c.replay.label = defaultPlaybackLabel(8);
-	c.replay.sceneName = defaultPlaybackSceneName(8);
-	c.highlights.label = defaultPlaybackLabel(9);
-	c.highlights.sceneName = defaultPlaybackSceneName(9);
-	c.intermission.label = defaultPlaybackLabel(10);
-	c.intermission.sceneName = defaultPlaybackSceneName(10);
-	c.ads.label = defaultPlaybackLabel(11);
-	c.ads.sceneName = defaultPlaybackSceneName(11);
+	c.replay.label = defaultPlaybackLabel(kSlotReplay);
+	c.replay.sceneName = defaultPlaybackSceneName(kSlotReplay);
+	c.highlights.label = defaultPlaybackLabel(kSlotHighlights);
+	c.highlights.sceneName = defaultPlaybackSceneName(kSlotHighlights);
+	c.intermission.label = defaultPlaybackLabel(kSlotIntermission);
+	c.intermission.sceneName = defaultPlaybackSceneName(kSlotIntermission);
+	c.ads.label = defaultPlaybackLabel(kSlotAds);
+	c.ads.sceneName = defaultPlaybackSceneName(kSlotAds);
 	return c;
 }
 
@@ -146,6 +153,7 @@ void saveConfig(const BankConfig &cfg, obs_data_t *data)
 {
 	obs_data_set_int(data, "version", kConfigVersion);
 	obs_data_set_string(data, "bank_id", cfg.bankId.c_str());
+	obs_data_set_int(data, "camera_count", cfg.cameraCount);
 	obs_data_set_string(data, "graphics_url", cfg.graphicsUrl.c_str());
 	obs_data_set_string(data, "graphics_uuid", cfg.graphicsUuid.c_str());
 	obs_data_set_bool(data, "graphics_visible", cfg.graphicsVisible);
@@ -202,7 +210,7 @@ static void migrateV1(BankConfig &c, obs_data_t *data)
 {
 	obs_data_array_t *cams = obs_data_get_array(data, "cameras");
 	size_t n = cams ? obs_data_array_count(cams) : 0;
-	for (size_t i = 0; i < n && i < 8; i++) {
+	for (size_t i = 0; i < n && i < kMaxCameras; i++) {
 		obs_data_t *d = obs_data_array_item(cams, i);
 		if (obs_data_has_user_value(d, "label"))
 			c.cameras[i].label = str(d, "label");
@@ -235,6 +243,8 @@ BankConfig loadConfig(obs_data_t *data, const std::string &fallbackBankId)
 	std::string bank = str(data, "bank_id");
 	if (!bank.empty())
 		c.bankId = bank;
+	if (obs_data_has_user_value(data, "camera_count")) // added in 1.5.0 (8 before)
+		c.cameraCount = clampCameraCount((int)obs_data_get_int(data, "camera_count"));
 	c.graphicsUrl = str(data, "graphics_url");
 	c.graphicsUuid = str(data, "graphics_uuid");
 	c.graphicsVisible =
@@ -250,7 +260,7 @@ BankConfig loadConfig(obs_data_t *data, const std::string &fallbackBankId)
 
 	obs_data_array_t *cams = obs_data_get_array(data, "cameras");
 	size_t n = cams ? obs_data_array_count(cams) : 0;
-	for (size_t i = 0; i < n && i < 8; i++) {
+	for (size_t i = 0; i < n && i < kMaxCameras; i++) {
 		obs_data_t *d = obs_data_array_item(cams, i);
 		CameraSlotConfig &s = c.cameras[i];
 		if (obs_data_has_user_value(d, "label"))

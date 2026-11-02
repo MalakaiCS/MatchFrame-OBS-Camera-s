@@ -78,7 +78,7 @@ static std::string graphicsBaseName(int slot)
 
 static std::string &sceneUuidRef(BankConfig &c, int slot)
 {
-	return slot < 8 ? c.cameras[slot].sceneUuid : c.playback(slot).sceneUuid;
+	return slotIsCamera(slot) ? c.cameras[slot].sceneUuid : c.playback(slot).sceneUuid;
 }
 
 OBSSourceAutoRelease SceneBank::slotScene(int slot) const
@@ -100,7 +100,7 @@ OBSSourceAutoRelease SceneBank::slotScene(int slot) const
 
 OBSSourceAutoRelease SceneBank::cameraInput(int cam)
 {
-	if (cam < 0 || cam >= 8)
+	if (cam < 0 || cam >= kMaxCameras)
 		return nullptr;
 	CameraSlotConfig &c = cfg_.cameras[cam];
 	if (c.inputUuid.empty() && c.inputName.empty())
@@ -169,7 +169,7 @@ int SceneBank::slotOfSceneUuid(const std::string &uuid) const
 {
 	if (uuid.empty())
 		return -1;
-	for (int i = 0; i < 8; i++)
+	for (int i = 0; i < kMaxCameras; i++)
 		if (cfg_.cameras[i].sceneUuid == uuid)
 			return i;
 	if (cfg_.replay.sceneUuid == uuid)
@@ -284,6 +284,21 @@ void SceneBank::applyFramingToItem(obs_sceneitem_t *item, Framing framing)
 // ---------------------------------------------------------------------------
 // create / repair
 
+// Each scene keeps the transition chosen for it in Setup. Only a setting that names a
+// transition which no longer exists is removed (OBS would silently ignore it).
+static void checkSceneTransition(obs_source_t *scene, RepairReport &r)
+{
+	const std::string name = sceneTransitionOverride(scene);
+	if (name.empty())
+		return;
+	OBSSourceAutoRelease tr = findTransitionByName(name);
+	if (tr)
+		return;
+	clearTransitionOverride(scene);
+	r.warn("'" + nameOf(scene) + "' was set to transition '" + name +
+	       "', which no longer exists - it now uses Cut (choose another in Setup → Transitions)");
+}
+
 OBSSourceAutoRelease SceneBank::resolveOrCreateScene(int slot, RepairReport &r)
 {
 	OBSSourceAutoRelease src = slotScene(slot);
@@ -293,7 +308,7 @@ OBSSourceAutoRelease SceneBank::resolveOrCreateScene(int slot, RepairReport &r)
 		r.reused++;
 		return src;
 	}
-	const std::string base = slot < 8 ? defaultCameraSceneName(slot) : defaultPlaybackSceneName(slot);
+	const std::string base = slotIsCamera(slot) ? defaultCameraSceneName(slot) : defaultPlaybackSceneName(slot);
 	const std::string name = uniqueSourceName(base);
 	if (name != base)
 		r.warn("'" + base + "' is used by an unrelated object; created '" + name + "' instead");
@@ -301,7 +316,7 @@ OBSSourceAutoRelease SceneBank::resolveOrCreateScene(int slot, RepairReport &r)
 	obs_source_t *s = obs_scene_get_source(scene);
 	markOwned(s, cfg_.bankId, sceneRole(slot));
 	uuid = uuidOf(s);
-	if (slot < 8)
+	if (slotIsCamera(slot))
 		cfg_.cameras[slot].sceneName = name;
 	else
 		cfg_.playback(slot).sceneName = name;
@@ -426,10 +441,7 @@ void SceneBank::repairCameraScene(int cam, obs_source_t *browser, RepairReport &
 	CameraSlotConfig &c = cfg_.cameras[cam];
 	c.sceneName = nameOf(sceneSrc);
 
-	if (!sceneTransitionOverride(sceneSrc).empty()) {
-		clearTransitionOverride(sceneSrc);
-		r.add("Removed per-scene transition override from '" + c.sceneName + "'");
-	}
+	checkSceneTransition(sceneSrc, r);
 
 	obs_sceneitem_t *camItem = nullptr;
 	OBSSourceAutoRelease input = cameraInput(cam);
@@ -478,10 +490,7 @@ void SceneBank::repairPlaybackScene(int slot, RepairReport &r)
 	PlaybackSlotConfig &p = cfg_.playback(slot);
 	p.sceneName = nameOf(sceneSrc);
 
-	if (!sceneTransitionOverride(sceneSrc).empty()) {
-		clearTransitionOverride(sceneSrc);
-		r.add("Removed per-scene transition override from '" + p.sceneName + "'");
-	}
+	checkSceneTransition(sceneSrc, r);
 
 	obs_sceneitem_t *mItem = nullptr;
 	if (mediaAvailable()) {
@@ -541,10 +550,7 @@ void SceneBank::repairIntermissionScene(RepairReport &r)
 		return;
 	PlaybackSlotConfig &p = cfg_.intermission;
 	p.sceneName = nameOf(sceneSrc);
-	if (!sceneTransitionOverride(sceneSrc).empty()) {
-		clearTransitionOverride(sceneSrc);
-		r.add("Removed per-scene transition override from '" + p.sceneName + "'");
-	}
+	checkSceneTransition(sceneSrc, r);
 	if (!browserAvailable()) {
 		r.warn("Browser Source is not available - the Intermission scene has no graphics page");
 		return;
@@ -584,7 +590,7 @@ RepairReport SceneBank::createOrRepair()
 		       "video-only switching and playback still work");
 	}
 
-	for (int cam = 0; cam < 8; cam++)
+	for (int cam = 0; cam < cfg_.cameraCount; cam++)
 		repairCameraScene(cam, browser, r);
 	repairPlaybackScene(kSlotReplay, r);
 	repairPlaybackScene(kSlotHighlights, r);
@@ -602,7 +608,7 @@ RepairReport SceneBank::createOrRepair()
 
 bool SceneBank::assignInput(int cam, const std::string &inputUuid, std::string *message)
 {
-	if (cam < 0 || cam >= 8)
+	if (cam < 0 || cam >= kMaxCameras)
 		return false;
 	CameraSlotConfig &c = cfg_.cameras[cam];
 	OBSSourceAutoRelease input;
@@ -694,7 +700,7 @@ std::vector<int> SceneBank::slotsSharingInput(int cam) const
 	const std::string &u = cfg_.cameras[cam].inputUuid;
 	if (u.empty())
 		return out;
-	for (int i = 0; i < 8; i++)
+	for (int i = 0; i < cfg_.cameraCount; i++)
 		if (i != cam && cfg_.cameras[i].inputUuid == u)
 			out.push_back(i);
 	return out;
@@ -706,12 +712,12 @@ void SceneBank::refreshNames()
 		OBSSourceAutoRelease s = slotScene(i);
 		if (!s)
 			continue;
-		if (i < 8)
+		if (slotIsCamera(i))
 			cfg_.cameras[i].sceneName = nameOf(s);
 		else
 			cfg_.playback(i).sceneName = nameOf(s);
 	}
-	for (int i = 0; i < 8; i++) {
+	for (int i = 0; i < kMaxCameras; i++) {
 		OBSSourceAutoRelease in = cameraInput(i);
 		if (in)
 			cfg_.cameras[i].inputName = nameOf(in);

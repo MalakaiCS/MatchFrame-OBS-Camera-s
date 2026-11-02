@@ -5,6 +5,8 @@
 // so it is unit tested directly.
 #pragma once
 
+#include "switch-logic.hpp"
+
 #include <array>
 #include <cstdint>
 #include <string>
@@ -48,8 +50,9 @@ struct PlaybackSlotConfig {
 
 struct BankConfig {
 	int version = kConfigVersion;
-	std::string bankId; // random id marking objects owned by this bank
-	std::array<CameraSlotConfig, 8> cameras;
+	std::string bankId;                // random id marking objects owned by this bank
+	int cameraCount = kDefaultCameras; // cameras in use: the first 4..16 of `cameras`
+	std::array<CameraSlotConfig, kMaxCameras> cameras;
 	PlaybackSlotConfig replay;
 	PlaybackSlotConfig highlights;
 	// Intermission: a graphics page (graphicsUrl / graphicsUuid / graphicsItemId), no media.
@@ -69,21 +72,29 @@ struct BankConfig {
 	std::string replayCueHighlightsScene; // empty = auto-detect
 	bool migratedFromV1 = false;          // set by load when an old schema was upgraded
 
-	// Slots 8..11: Replay, Highlights, Intermission, Video Ads.
+	// Slots after the cameras: Replay, Highlights, Intermission, Video Ads.
 	PlaybackSlotConfig &playback(int slot)
 	{
-		return slot == 8 ? replay : slot == 10 ? intermission : slot == 11 ? ads : highlights;
+		return slot == kSlotReplay         ? replay
+		       : slot == kSlotIntermission ? intermission
+		       : slot == kSlotAds          ? ads
+						   : highlights;
 	}
 	const PlaybackSlotConfig &playback(int slot) const
 	{
-		return slot == 8 ? replay : slot == 10 ? intermission : slot == 11 ? ads : highlights;
+		return slot == kSlotReplay         ? replay
+		       : slot == kSlotIntermission ? intermission
+		       : slot == kSlotAds          ? ads
+						   : highlights;
 	}
+	bool cameraInUse(int cam) const { return cam >= 0 && cam < cameraCount; }
 };
 
 // Default names and labels from the production brief.
-const char *defaultCameraSceneName(int cam); // "MF — CAM 01".."MF — CAM 08"
+const char *defaultCameraSceneName(int cam); // "MF — CAM 01".."MF — CAM 16"
 const char *defaultCameraLabel(int cam);
-const char *defaultPlaybackSceneName(int slot); // slots 8..11
+const char *defaultPlaybackSceneName(int slot); // kSlotReplay..kSlotAds
+int clampCameraCount(int n);                    // 4..16
 const char *defaultPlaybackLabel(int slot);
 
 BankConfig makeDefaultConfig(const std::string &bankId);

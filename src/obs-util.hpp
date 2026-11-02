@@ -53,11 +53,21 @@ const char *graphicsSourceTypeId();
 OBSSourceAutoRelease findCutTransition();
 OBSSourceAutoRelease findTransitionByName(const std::string &name);
 
-// Per-scene transition override (stored by OBS in the scene's private settings).
+// Per-scene transition: OBS's own per-scene "Transition Override", stored in the scene's
+// private settings. OBS applies it whenever that scene is transitioned to Program (the
+// plugin's CUT / Return Live, OBS's Transition button, hotkeys). Empty name = none, so
+// the plugin's default Cut is used.
 std::string sceneTransitionOverride(obs_source_t *scene);
-// True when the override exists and is not a Cut transition (or cannot be resolved).
-bool overrideConflicts(obs_source_t *scene, std::string *overrideName = nullptr);
+int sceneTransitionDuration(obs_source_t *scene); // ms; OBS's default when unset
+void setSceneTransition(obs_source_t *scene, const std::string &name, int durationMs);
 void clearTransitionOverride(obs_source_t *scene);
+// The frontend's transitions, by display name (includes Cut).
+std::vector<std::string> transitionNames();
+// True for transitions without an adjustable duration (Cut, Stinger).
+bool transitionIsFixed(obs_source_t *transition);
+bool transitionIsCutType(obs_source_t *transition);
+// "Cut", "Fade 300 ms", "Stinger" ... for the scene's effective transition when taken.
+std::string describeSceneTransition(obs_source_t *scene);
 
 // True while the program transition is mid-way (0 < t < 1).
 bool transitionInProgress();

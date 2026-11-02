@@ -221,24 +221,64 @@ std::string sceneTransitionOverride(obs_source_t *scene)
 	return t ? t : "";
 }
 
-bool overrideConflicts(obs_source_t *scene, std::string *overrideName)
+int sceneTransitionDuration(obs_source_t *scene)
 {
-	std::string name = sceneTransitionOverride(scene);
-	if (overrideName)
-		*overrideName = name;
-	if (name.empty())
-		return false;
-	OBSSourceAutoRelease tr = findTransitionByName(name);
-	if (!tr)
-		return false; // OBS ignores overrides naming a transition that no longer exists
-	return strcmp(obs_source_get_unversioned_id(tr), "cut_transition") != 0;
+	if (!scene)
+		return 300;
+	OBSDataAutoRelease priv = obs_source_get_private_settings(scene);
+	obs_data_set_default_int(priv, "transition_duration", 300); // OBS's own default
+	return (int)obs_data_get_int(priv, "transition_duration");
+}
+
+void setSceneTransition(obs_source_t *scene, const std::string &name, int durationMs)
+{
+	if (!scene)
+		return;
+	OBSDataAutoRelease priv = obs_source_get_private_settings(scene);
+	if (name.empty()) {
+		obs_data_erase(priv, "transition");
+		obs_data_erase(priv, "transition_duration");
+		return;
+	}
+	obs_data_set_string(priv, "transition", name.c_str());
+	obs_data_set_int(priv, "transition_duration", durationMs);
 }
 
 void clearTransitionOverride(obs_source_t *scene)
 {
-	OBSDataAutoRelease priv = obs_source_get_private_settings(scene);
-	obs_data_erase(priv, "transition");
-	obs_data_erase(priv, "transition_duration");
+	setSceneTransition(scene, "", 0);
+}
+
+std::vector<std::string> transitionNames()
+{
+	std::vector<std::string> out;
+	obs_frontend_source_list list = {};
+	obs_frontend_get_transitions(&list);
+	for (size_t i = 0; i < list.sources.num; i++)
+		out.push_back(nameOf(list.sources.array[i]));
+	obs_frontend_source_list_free(&list);
+	return out;
+}
+
+bool transitionIsFixed(obs_source_t *transition)
+{
+	return transition && obs_transition_fixed(transition);
+}
+
+bool transitionIsCutType(obs_source_t *transition)
+{
+	return transition && strcmp(obs_source_get_unversioned_id(transition), "cut_transition") == 0;
+}
+
+std::string describeSceneTransition(obs_source_t *scene)
+{
+	const std::string name = sceneTransitionOverride(scene);
+	OBSSourceAutoRelease tr = name.empty() ? nullptr : findTransitionByName(name);
+	if (!tr || transitionIsCutType(tr))
+		return "Cut"; // no setting, a deleted transition (OBS ignores it) or Cut itself
+	if (transitionIsFixed(tr))
+		return name;
+	return name + " " + std::to_string(sceneTransitionDuration(scene)) + " ms";
 }
 
 bool transitionInProgress()

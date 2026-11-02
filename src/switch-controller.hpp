@@ -17,7 +17,8 @@ struct SwitchView {
 	std::string previewName, programName;
 	std::string previewUuid, programUuid;
 	int previewSlot = -1, programSlot = -1;
-	std::string transitionName; // the frontend's selected transition
+	std::string transitionName;            // the frontend's selected transition
+	std::string previewTransition = "Cut"; // what a take of the Preview scene will use
 	bool transitionIsCut = false;
 	int lastCameraSlot = -1;
 	bool returnLiveEnabled = false;
@@ -55,6 +56,7 @@ public:
 
 private:
 	bool ensureCutTransition(std::string *message);
+	void prepareTake(obs_source_t *target);
 	CutFacts cutFacts();
 	ReturnLiveFacts returnLiveFacts(OBSSourceAutoRelease &target);
 

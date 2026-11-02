@@ -84,7 +84,8 @@ public:
 	QPaintEngine *paintEngine() const override { return nullptr; }
 
 	// Publishes a new set of panes (UI thread). Cheap when nothing changed.
-	void setPanes(std::array<PaneSpec, kPaneCount> &&panes);
+	// `cameraCount` (4..16) decides the layout; camera panes beyond it are not shown.
+	void setPanes(std::array<PaneSpec, kPaneCount> &&panes, int cameraCount);
 	// Drops the snapshot and every source reference held for rendering.
 	void releaseSources();
 
@@ -125,6 +126,7 @@ private:
 	QString displayError_;
 	std::array<PaneSpec, kPaneCount> panes_;
 	Layout logicalLayout_;
+	int cameraCount_ = 8;
 
 	std::mutex snapMutex_;
 	std::shared_ptr<RenderSnapshot> snapshot_;

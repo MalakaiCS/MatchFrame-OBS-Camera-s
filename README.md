@@ -1,15 +1,15 @@
 # MatchFrame Multiview (OBS Studio plugin)
 
-A native OBS Studio plugin for live sports production. It builds a bank of **twelve
-production scenes**: eight camera scenes, **Replay**, **Highlights**, **Intermission** and
-**Video Ads**. It opens a native **fourteen-pane multiview**: all twelve scene tiles plus the
+A native OBS Studio plugin for live sports production. It builds a bank of production
+scenes: **4 to 16 camera scenes** (8 by default), **Replay**, **Highlights**, **Intermission**
+and **Video Ads**. It opens a native multiview with all of those scene tiles plus the
 actual OBS **Preview** and **Program**. Operators stage a tile in Preview, hard-**CUT** it to
 Program, run prepared replay / half-time / full-time media, an intermission page or a run
 of video ads, and **Return Live** to the last camera.
 
 OBS still does everything else: capture, composition, encoding, recording and streaming.
 The existing MatchFrame graphics output is used as a transparent Browser Source. One
-shared instance is referenced in all eight camera scenes, so the clock, score and
+shared instance is referenced in every camera scene, so the clock, score and
 animations keep running across cuts. The plugin adds no streaming engine and no MatchFrame
 API, endpoints or credentials.
 
@@ -29,13 +29,14 @@ API, endpoints or credentials.
 
 | Scene (default name) | Contents, bottom → top | Default tile label |
 |---|---|---|
-| `MF — CAM 01` … `MF — CAM 08` | your existing OBS camera input → `MF — MatchFrame Overlay` (shared Browser Source reference) | Main Wide, Tight / Follow, Left Goal, Right Goal, Sideline, Reverse Angle, Bench / Crowd, Handheld / Spare |
+| `MF — CAM 01` … `MF — CAM 16` (as many as you use) | your existing OBS camera input → `MF — MatchFrame Overlay` (shared Browser Source reference) | Main Wide, Tight / Follow, Left Goal, Right Goal, Sideline, Reverse Angle, Bench / Crowd, Handheld / Spare, then Camera 9 … Camera 16 |
 | `MF — REPLAY` | `MF — Replay Media` (Media Source) → optional `MF — Replay Graphics` | Replay |
 | `MF — HIGHLIGHTS` | `MF — Highlights Media` (Media Source) → optional `MF — Highlights Graphics` | Half-Time / Full-Time Highlights |
 | `MF — INTERMISSION` | `MF — Intermission Graphics` (Browser Source with your intermission page URL) | Intermission |
 | `MF — VIDEO ADS` | `MF — Video Ads Media` (Media Source playing your ads playlist) → optional `MF — Video Ads Graphics` | Video Ads |
 
-* There are exactly twelve scenes and no hidden "graphics helper" scene. Unrelated scenes in
+* There is one scene per camera in use plus the four above, and no hidden "graphics helper"
+  scene. Unrelated scenes in
   your collection are left alone.
 * The scenes are ordinary OBS scenes. You can rename them and edit them; ownership is
   tracked by UUID and a private marker, never by name.
@@ -55,10 +56,13 @@ surface, with Qt controls kept outside it:
 └ HIGHLIGHTS … │ VIDEO ADS  Ad 1/3 · file · READY · Load Ads… · Arm · Play · Restart                ┘
 ```
 
-The layout adapts to the window. On 16:9 and wider screens it switches to a wide
-arrangement under the monitors: cameras 1–4 + Replay + Intermission, then cameras 5–8 +
-Highlights + Video Ads. That drops a row, so the monitors are larger. Tall windows keep the stacked rows shown above. Use
-**Full Screen** for the largest panes.
+The layout adapts to the window and to the number of cameras. On 16:9 and wider screens it
+uses a wide arrangement under the monitors: the camera rows, with Replay + Intermission at
+the end of the first row and Highlights + Video Ads at the end of the second. With 8
+cameras that is cameras 1–4 + Replay + Intermission, then cameras 5–8 + Highlights +
+Video Ads. With more cameras it tries two, three and four rows and keeps whichever gives the
+largest monitors; on a 1080p screen, 16 cameras still leave the monitors about 940 px wide.
+Tall windows stack the camera rows with a compact row of the four extra scenes underneath.
 
 Every tile shows its composed OBS scene. By default the camera tiles and the Preview pane
 show the cameras **without** the camera graphics, so you can still see every camera while a
@@ -73,17 +77,17 @@ read from OBS's real output state.
 
 ### Linux (built and tested: x86_64, OBS 30.2.x)
 
-Per-user install from `dist/matchframe-multiview-1.3.0-linux-x86_64.tar.gz`:
+Per-user install from `dist/matchframe-multiview-1.5.0-linux-x86_64.tar.gz`:
 
 ```bash
 mkdir -p ~/.config/obs-studio/plugins
-tar -xzf matchframe-multiview-1.3.0-linux-x86_64.tar.gz -C ~/.config/obs-studio/plugins
+tar -xzf matchframe-multiview-1.5.0-linux-x86_64.tar.gz -C ~/.config/obs-studio/plugins
 # result: ~/.config/obs-studio/plugins/matchframe-multiview/bin/64bit/matchframe-multiview.so
 #         ~/.config/obs-studio/plugins/matchframe-multiview/data/locale/en-US.ini
 ```
 
-Or install system-wide with the Debian package (`dist/matchframe-multiview-1.3.0-x86_64-linux-gnu.deb`):
-`sudo apt install ./matchframe-multiview-1.3.0-x86_64-linux-gnu.deb`.
+Or install system-wide with the Debian package (`dist/matchframe-multiview-1.5.0-x86_64-linux-gnu.deb`):
+`sudo apt install ./matchframe-multiview-1.5.0-x86_64-linux-gnu.deb`.
 
 Restart OBS. **Tools → MatchFrame Multiview** should appear, and the OBS log should show
 `[matchframe-multiview] plugin loaded successfully`.
@@ -102,17 +106,17 @@ across major versions, so build from source for any other OBS version (see §8).
 Built by CI on GitHub's `windows-2022` runners (MSVC, against OBS 31.1.1 from
 `buildspec.json`). **Compiled, not runtime-tested.**
 
-* **Installer:** run `matchframe-multiview-1.3.0-windows-x64-Installer.exe`. Close OBS first.
+* **Installer:** run `matchframe-multiview-1.5.0-windows-x64-Installer.exe`. Close OBS first.
   It installs into `%ProgramData%\obs-studio\plugins\matchframe-multiview\`, which OBS 30+
   loads automatically, and registers an uninstaller under *Settings → Apps*.
-* **Manual:** extract `matchframe-multiview-1.3.0-windows-x64.zip` into
+* **Manual:** extract `matchframe-multiview-1.5.0-windows-x64.zip` into
   `%ProgramData%\obs-studio\plugins\`. To uninstall, delete that folder.
 
 ### macOS (universal: Apple silicon + Intel, OBS 30 or newer)
 
 Built by CI on GitHub's `macos-15` runners. **Compiled, not runtime-tested.**
 
-* **Installer:** open `matchframe-multiview-1.3.0-macos-universal.pkg`. It installs
+* **Installer:** open `matchframe-multiview-1.5.0-macos-universal.pkg`. It installs
   `matchframe-multiview.plugin` into `~/Library/Application Support/obs-studio/plugins/`.
   The package is **unsigned and not notarized**, because no Apple Developer ID is set up in CI.
   macOS will block it the first time: right-click (or Control-click) the `.pkg` and choose
@@ -130,7 +134,12 @@ The workflow uses them automatically.
    working scene of your own. The plugin only references inputs; it never configures
    devices.
 2. Open **Tools → MatchFrame Multiview → Setup…**
-   * **Camera scenes:** pick an input for each of slots 1–8. One to eight cameras all work.
+   * **Number of cameras:** choose 4 to 16 (default 8). The multiview, the camera rows here
+     and the Transitions list follow it. After raising it, press **Create / Repair** to add
+     the new camera scenes. Lowering it hides the extra cameras but deletes nothing: their
+     scenes stay in OBS and come back if you raise the number again.
+   * **Camera scenes:** pick an input for each camera slot. Unassigned slots are simply
+     dimmed.
      Unused slots stay visible as `UNASSIGNED` and can't be selected. If you assign the
      same input to two slots, you get a warning: it's the same feed, not an extra camera.
      **Fit** / **Fill** reset that camera's framing. Otherwise your crop, position and scale
@@ -149,9 +158,9 @@ The workflow uses them automatically.
    plugin takes are disabled without it.
 
 **Create / Repair** is idempotent. It reuses plugin-owned objects and recreates only what's
-missing. It restores the graphics item above the camera, clears per-scene transition
-overrides on the ten owned scenes, and keeps your manual framing, filters and input
-properties. It never switches Program and never starts an output. If a default name is
+missing. It restores the graphics item above the camera, keeps each scene's transition
+(removing only one that names a transition you have since deleted), and keeps your manual
+framing, filters and input properties. It never switches Program and never starts an output. If a default name is
 taken by an unrelated object, it uses `… (2)` and reports it. It is **disabled while
 streaming or recording**, and so are input assignments. Switching, loading media into an
 off-air playback slot, transport and graphics visibility all still work then.
@@ -170,6 +179,7 @@ when that reloads the page. Camera cuts never touch the browser.
 | Click any scene tile | Puts that scene in OBS **Preview**. Program is unchanged. |
 | **CUT** button or **Space** | Hard cut of the actual OBS Preview to Program (selects OBS's *Cut* transition) |
 | Keys **1–8** | Preview camera 1–8 |
+| Keys **Q W E R T Y U I** | Preview camera 9–16 (the row under the digits) |
 | Key **9** / **0** | Preview Replay / Highlights (must be READY) |
 | Key **-** / **=** | Preview Intermission / Video Ads (Video Ads must be READY) |
 | **Return Live** | **Immediate on-air cut** to the last camera that was actually on Program. Preview is left as it is. |
@@ -179,7 +189,7 @@ when that reloads the page. Camera cuts never touch the browser.
 
 * Shortcuts work only while the multiview window has focus. Held-key auto-repeat is
   ignored. Typing in any field, picker or dialog never switches.
-* **OBS hotkeys** (Settings → Hotkeys): *MatchFrame: Preview Camera 1–8*, *Preview
+* **OBS hotkeys** (Settings → Hotkeys): *MatchFrame: Preview Camera 1–16*, *Preview
   Replay*, *Preview Highlights*, *Preview Intermission*, *Preview Video Ads*, *CUT*,
   *Return Live*. They're **unbound by default**,
   to avoid collisions and accidental takes.
@@ -187,18 +197,38 @@ when that reloads the page. Camera cuts never touch the browser.
   CUT is refused while another OBS transition is still running.
 * CUT is refused, with a message, when:
   - the Preview camera is unassigned or its input was deleted;
-  - a playback scene is not READY;
-  - the Preview scene has a per-scene transition override that isn't Cut. The plugin never
-    silently fades; remove the override or run Repair.
+  - a playback scene is not READY.
 * If Preview and Program are the same scene, CUT does nothing and never restarts media.
 * After a cut, the plugin shows whatever OBS really did. That includes OBS's "swap Preview
   and Program" preference.
-* **Camera Graphics ON/OFF** sets the plugin's overlay item visibility in all eight camera
+* **Camera Graphics ON/OFF** sets the plugin's overlay item visibility in all the camera
   scenes at once. It also covers the scene instance currently on Program, since Studio
   Mode's default *Duplicate Scene* puts a private copy there. The page stays loaded. If
   you edit visibility by hand in OBS and the scenes disagree, the button shows **MIXED**
   until you apply a global state. This control doesn't affect the Replay/Highlights
   overlays.
+
+### Transitions per scene
+
+Every scene takes a hard **Cut** unless you choose otherwise. In **Setup → Transitions**,
+pick a transition for any scene, such as a Stinger into Replay, a 500 ms
+Fade into Intermission, or a Fade back to the main camera. Set a duration for the
+transitions that have one. The list shows the transitions in OBS's Scene Transitions dock,
+so add a Stinger or Fade there first.
+
+* The setting is the transition used when **that scene is taken to Program**:
+  - **CUT** uses the Preview scene's transition;
+  - **Return Live** uses the camera's transition;
+  - OBS's own Transition button and hotkeys use it too.
+
+  The button changes from **CUT** to **TAKE · Fade 500 ms**, and *Next take:* in the toolbar
+  shows what the Preview scene will use.
+* It is OBS's own per-scene *Transition Override* (right-click a scene in OBS), so a choice
+  made in either place shows in the other. It is saved with the scene collection.
+* Replay, Highlights and Video Ads start playing as soon as their scene starts to come on
+  air, so with a Fade or Stinger the clip runs underneath it.
+* A take with a transition is still one take. Further presses are ignored until it
+  finishes, and Preview selection keeps working meanwhile.
 
 ### Replay and Highlights
 

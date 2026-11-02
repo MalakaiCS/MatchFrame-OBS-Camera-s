@@ -399,8 +399,14 @@ void MultiviewWindow::keyPressEvent(QKeyEvent *event)
 		return;
 	}
 	const int k = event->key();
+	// Cameras 9-16 sit on the row under the digits: Q W E R T Y U I.
+	static const int kUpperCams[] = {Qt::Key_Q, Qt::Key_W, Qt::Key_E, Qt::Key_R,
+					 Qt::Key_T, Qt::Key_Y, Qt::Key_U, Qt::Key_I};
+	const int *upper = std::find(std::begin(kUpperCams), std::end(kUpperCams), k);
 	if (k >= Qt::Key_1 && k <= Qt::Key_8) {
 		controller_->selectSlot(k - Qt::Key_1);
+	} else if (upper != std::end(kUpperCams)) {
+		controller_->selectSlot(8 + (int)(upper - std::begin(kUpperCams)));
 	} else if (k == Qt::Key_9) {
 		controller_->selectSlot(kSlotReplay);
 	} else if (k == Qt::Key_0) {
@@ -543,8 +549,15 @@ void MultiviewWindow::updateToolbar()
 	}
 	SwitchView sv = c->switcher().view();
 
+	// The button names what the take will do: CUT, or TAKE · Fade 500 ms for a scene with
+	// its own transition (Setup → Transitions).
+	const bool hardCut = sv.previewTransition == "Cut";
+	const QString via = QString::fromStdString(sv.previewTransition);
+	cut_->setText(hardCut ? "CUT" : QString("TAKE · %1").arg(via));
 	cut_->setEnabled(sv.cutEnabled);
-	cut_->setToolTip(sv.cutEnabled ? "Hard cut Preview → Program" : QString::fromStdString(sv.cutReason));
+	cut_->setToolTip(!sv.cutEnabled ? QString::fromStdString(sv.cutReason)
+			 : hardCut      ? "Hard cut Preview → Program"
+					: QString("Preview → Program with %1 (this scene's transition)").arg(via));
 	studio_->setVisible(!sv.studioMode);
 
 	QString rl = "RETURN LIVE";
@@ -552,9 +565,11 @@ void MultiviewWindow::updateToolbar()
 		rl += QString(" → CAM %1").arg(sv.lastCameraSlot + 1);
 	returnLive_->setText(rl);
 	returnLive_->setEnabled(sv.returnLiveEnabled);
-	returnLive_->setToolTip(sv.returnLiveEnabled ? "Immediate on-air cut to the last camera that was on Program"
-						     : QString::fromStdString(sv.returnLiveReason));
-	returnLive_->setStyleSheet(sv.returnLiveEnabled && sv.programSlot >= kCameraCount
+	returnLive_->setToolTip(sv.returnLiveEnabled
+					? "Immediate on-air take of the last camera that was on Program, with that "
+					  "camera scene's transition"
+					: QString::fromStdString(sv.returnLiveReason));
+	returnLive_->setStyleSheet(sv.returnLiveEnabled && sv.programSlot >= kMaxCameras
 					   ? "QPushButton{background:#7a4a00;color:white;font-weight:bold;}"
 					   : "");
 
@@ -563,15 +578,14 @@ void MultiviewWindow::updateToolbar()
 	graphics_->setEnabled(gv == GraphicsVisibility::On || gv == GraphicsVisibility::Off ||
 			      gv == GraphicsVisibility::Mixed);
 	graphics_->setToolTip(gv == GraphicsVisibility::Mixed
-				      ? "Items differ between camera scenes – click to apply ON to all eight"
+				      ? "Items differ between camera scenes – click to apply ON to all of them"
 			      : gv == GraphicsVisibility::Unavailable
 				      ? "Browser Source is not available in this OBS installation"
-				      : "Show / hide the shared MatchFrame overlay in all eight camera scenes");
+				      : "Show / hide the shared MatchFrame overlay in every camera scene");
 
-	transition_->setText(
-		sv.transitionIsCut
-			? "Transition: Cut"
-			: QString("Transition: %1 (CUT selects Cut)").arg(QString::fromStdString(sv.transitionName)));
+	transition_->setText(QString("Next take: %1").arg(via));
+	transition_->setToolTip("The transition the Preview scene uses when it is taken. Set it per scene in "
+				"Setup → Transitions (default Cut).");
 	QString st;
 	if (!sv.studioMode)
 		st = "STUDIO MODE OFF – plugin takes disabled";
@@ -698,7 +712,7 @@ void MultiviewWindow::updatePanes()
 	if (sv.transitionActive)
 		pg.status = "TRANSITION";
 
-	for (int cam = 0; cam < 8; cam++) {
+	for (int cam = 0; cam < c->config().cameraCount; cam++) {
 		PaneSpec &p = panes[paneForCamera(cam)];
 		SlotFacts f = c->switcher().slotFacts(cam);
 		const CameraSlotConfig &cc = c->config().cameras[cam];
@@ -789,7 +803,7 @@ void MultiviewWindow::updatePanes()
 	if (c->replayCueMode())
 		replayCuePanes(panes, sv);
 
-	surface_->setPanes(std::move(panes));
+	surface_->setPanes(std::move(panes), c->config().cameraCount);
 }
 
 // ---------------------------------------------------------------------------

@@ -36,8 +36,9 @@ FPS at the top of your results.
 ## Switching
 - [ ] (auto) Click each valid tile: only Preview changes. Unassigned tiles are dimmed and refuse selection.
 - [ ] (auto) CUT / Space: hard cut, no fade, even if Fade was selected in OBS beforehand (plugin selects Cut and shows it).
-- [ ] (auto) Add a per-scene Fade override to a camera scene (right-click scene → Transition override): CUT is refused
-      with a message; Repair removes the override.
+- [ ] (auto) Setup → Transitions: set a camera to Fade 800 ms → the button reads TAKE · Fade 800 ms and the take fades;
+      Return Live to that camera fades; scenes left on Cut still hard-cut; Repair keeps the setting.
+- [ ] With a real Stinger: set Replay to the Stinger → the replay starts under the stinger and the stinger plays fully.
 - [ ] (auto) Hold Space / hammer CUT: one take only.
 - [ ] (auto) Type `1234` into the Setup URL field and the rename dialog: no switching.
 - [ ] Settings → Hotkeys: MatchFrame actions exist and are unbound; bind one, verify it works, restart OBS, binding kept.
@@ -86,3 +87,9 @@ FPS at the top of your results.
 - [ ] (auto) Load two or more ads → READY on ad 1; `=` then CUT → they play in order; after the last: ENDED, no
       auto-switch; Return Live → re-armed at ad 1.
 - [ ] Ad audio is heard only while Video Ads is on Program.
+
+## Number of cameras
+- [ ] (auto) Setup → Number of cameras 12 → Create / Repair adds CAM 09-12; the multiview shows 12 camera tiles.
+- [ ] (auto) Key R previews camera 12; CUT takes it.
+- [ ] (auto) 16 → every tile laid out; 4 → cameras 5-16 hidden, not selectable, scenes kept.
+- [ ] On the real monitor at 12 and 16 cameras: tiles readable, labels legible, Full Screen fills the screen.

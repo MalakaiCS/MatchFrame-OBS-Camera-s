@@ -10,7 +10,7 @@ Legend: **PASS** = verified · **UNRUN** = not executed here (with the reason) �
 
 ## 1. Automated unit tests (no OBS needed)
 
-`build_x86_64/matchframe-unit-tests`: **37 tests, 11489 checks, 0 failures.**
+`build_x86_64/matchframe-unit-tests`: **39 tests, 32526 checks, 0 failures** (the layout is now checked for every camera count from 4 to 16).
 
 They cover:
 * layout and hit testing at 1080p, 4K, the minimum size, portrait and 4:3/21:9 canvases,
@@ -30,8 +30,8 @@ feeds (`tests/media/cam1..8.mp4` as looping Media Sources) and the two test clip
 Commentary is a looping 440 Hz tone on a global audio channel. OBS records Program and
 `analyze-recording.py` checks the recording. Phase 2 restarts OBS.
 
-**Final run (1.3.0 code):** phase 1 **51/51 PASS**, phase 2 **9/9 PASS**, phase 3 **10/10
-PASS**, recording analysis **9/9 PASS** (141 s recording; this run used a 5 s performance
+**Final run (1.5.0 code):** phase 1 **52/52 PASS**, phase 2 **9/9 PASS**, phase 3 **14/14
+PASS**, recording analysis **9/9 PASS** (128 s recording; this run used a 5 s performance
 window, so the performance figures in section 4 are from an earlier 30 s run).
 
 **Long run (30-min soak, previous build):** phase 1 41/42 and phase 2 8/8. 449 takes ran
@@ -48,7 +48,7 @@ During the soak, a compile job ran concurrently for a few minutes.
 
 | ID | Check | Result |
 |---|---|---|
-| C01 | Exactly twelve plugin-owned scenes (8 cameras, Replay, Highlights, Intermission, Video Ads) | PASS |
+| C01 | One plugin-owned scene per camera in use (8 in phase 1) plus Replay, Highlights, Intermission, Video Ads | PASS |
 | C01b | Name collision with an unrelated object → `MF — CAM 05 (2)` + warning | PASS |
 | C02 | One graphics source shared by all eight camera scenes; no helper scene | PASS* |
 | C03 | Each camera scene: own input at the bottom, shared graphics item directly above | PASS* |
@@ -58,8 +58,10 @@ During the soak, a compile job ran concurrently for a few minutes.
 | C07 | Graphics restored above the camera after edits; camera framing kept | PASS* |
 | C08 | Clicking each valid tile changes Preview only | PASS |
 | C09 / C09b | Unassigned slot cannot be selected (7 cameras); 8th assignment completes the bank | PASS |
-| C10 | CUT uses the Cut transition even when Fade was selected; hard cut | PASS |
-| C11 / C11b | Non-Cut per-scene override blocks CUT with a message; Repair clears overrides | PASS |
+| C10 | A scene without its own transition hard-cuts even when Fade was selected in OBS | PASS |
+| C11 | A scene set to Fade 800 ms is taken with that fade (fade observed, Program after 1004 ms); the button reads TAKE · Fade 800 ms | PASS |
+| C11c | Return Live uses the target camera's transition (fade observed, 1112 ms) | PASS |
+| C11b | Create / Repair keeps scene transitions (Fade 400 ms kept); a setting naming a deleted transition is removed with a warning | PASS |
 | C12 | 20 rapid CUTs → exactly one take | PASS |
 | C13 | Number keys select Preview; auto-repeat ignored | PASS |
 | C14 | Typing in the URL field never selects/takes (key reached the field, Preview unchanged) | PASS |
@@ -96,6 +98,10 @@ During the soak, a compile job ran concurrently for a few minutes.
 | C45 | After the last ad: ENDED, no loop, no automatic scene change | PASS |
 | C46 | Return Live after the ads goes back to the camera; the playlist re-arms at ad 1 | PASS |
 | P09 | After restart: Intermission URL and the Video Ads playlist restored; P05 now also requires the first ad re-armed | PASS |
+| N01 | 12 cameras: Create / Repair adds CAM 09-12 (16 scenes); camera 12 has a tile, camera 13 none | PASS (phase 3) |
+| N02 | Key R previews camera 12; CUT takes it; it becomes the Return Live camera | PASS (phase 3) |
+| N03 | 16 cameras: every tile laid out; camera 16 shows NO SCENE until Create / Repair | PASS (phase 3) |
+| N04 | 4 cameras: cameras 5-16 hidden and not selectable, scenes kept, Return Live won't go to a hidden camera | PASS (phase 3) |
 | C41 | Setup opens within the screen and, shrunk to 800×420, scrolls every button into view (23 buttons, scroll range 847 px) | PASS |
 | P01–P05 | After an OBS restart: 10 scenes, UUID assignments, renamed scene, labels / URL / files, last live camera, playback re-armed | PASS |
 | P06–P08 | Switching to a new collection gives an empty bank with no stale references; switching back restores the bank; playback re-armed | PASS |
@@ -179,6 +185,7 @@ measurement with real inputs is PENDING (hardware).**
 | Browser shutdown / refresh flags in a live CEF instance; Apply URL reload count | **UNRUN** | Same reason. |
 | Clean multiview tiles with a real Browser Source (full-screen break graphic) | **UNRUN** | Same reason; the filter path was verified with the stand-in source (C40). |
 | Intermission with a real Browser Source page | **UNRUN** | Same reason; the scene and switching were verified with the stand-in source (C42). |
+| Stinger transitions | **UNRUN** | Only Fade was exercised; Stinger needs a stinger video. It uses the same OBS per-scene mechanism. |
 | Video Ads gap between ads with real ad files | **UNRUN** | Ads were silent 8 s test clips; the switch to the next ad reopens the media source, so a frame or two of hold between ads is possible. |
 | Graphics fixture page itself | PASS (headless Chromium: transparent, clock running, load ID reported to the server) | – |
 | Windows / macOS build and runtime | **UNRUN** | Only Linux built. |

@@ -62,7 +62,7 @@ static bool overlaps(const Rect &a, const Rect &b)
 	return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 }
 
-static void checkLayoutInvariants(double w, double h, double aspect, double dpr)
+static void checkLayoutInvariants(double w, double h, double aspect, double dpr, int cams = 8)
 {
 	LayoutInput in;
 	in.width = w * dpr;
@@ -70,35 +70,41 @@ static void checkLayoutInvariants(double w, double h, double aspect, double dpr)
 	in.canvasAspect = aspect;
 	in.spacing = 6 * dpr;
 	in.labelHeight = 22 * dpr;
+	in.cameraCount = cams;
 	Layout l = computeLayout(in);
 	CHECK(l.valid);
 	if (!l.valid)
 		return;
 	for (int i = 0; i < kPaneCount; i++) {
 		const PaneGeometry &g = l.panes[i];
+		if (!paneInUse(i, cams)) {
+			CHECK(g.outer.empty()); // unused cameras get no pane
+			continue;
+		}
 		CHECK(rectInside(g.outer, in.width, in.height));
 		CHECK(g.video.w > 0 && g.video.h > 0);
 		// exact canvas aspect for every pane
 		CHECK(std::fabs(g.video.w / g.video.h - aspect) < 1e-6);
 		for (int j = i + 1; j < kPaneCount; j++)
-			CHECK(!overlaps(g.outer, l.panes[j].outer));
+			if (paneInUse(j, cams))
+				CHECK(!overlaps(g.outer, l.panes[j].outer));
 	}
 	// Priority: Preview/Program larger than cameras, cameras >= playback tiles.
 	CHECK(l.panes[kPanePreview].video.w > l.panes[kPaneCam1].video.w);
 	CHECK(l.panes[kPaneCam1].video.w >= l.panes[kPaneReplay].video.w);
-	// Row order: monitors on top, cameras 1-4 above 5-8, playback below the monitors.
+	// Row order: monitors on top, cameras in reading order, playback below the monitors.
 	CHECK(l.panes[kPanePreview].outer.y < l.panes[kPaneCam1].outer.y);
-	CHECK(l.panes[kPaneCam1].outer.y < l.panes[kPaneCam1 + 4].outer.y);
 	CHECK(l.panes[kPanePreview].outer.y < l.panes[kPaneReplay].outer.y);
 	CHECK(l.panes[kPaneReplay].outer.y <= l.panes[kPaneHighlights].outer.y);
-	// Program right of Preview, cameras ordered left to right.
 	CHECK(l.panes[kPaneProgram].outer.x > l.panes[kPanePreview].outer.x);
-	for (int c = 0; c < 3; c++) {
-		CHECK(l.panes[kPaneCam1 + c].outer.x < l.panes[kPaneCam1 + c + 1].outer.x);
-		CHECK(l.panes[kPaneCam1 + 4 + c].outer.x < l.panes[kPaneCam1 + 5 + c].outer.x);
+	for (int c = 0; c + 1 < cams; c++) {
+		const Rect &a = l.panes[kPaneCam1 + c].outer, &b = l.panes[kPaneCam1 + c + 1].outer;
+		CHECK(b.y > a.y || (b.y == a.y && b.x > a.x));
 	}
 	// Hit testing: centre of every pane maps back to that pane, at this DPI.
 	for (int i = 0; i < kPaneCount; i++) {
+		if (!paneInUse(i, cams))
+			continue;
 		const Rect &r = l.panes[i].outer;
 		CHECK_EQ(hitTest(l, r.x + r.w / 2, r.y + r.h / 2), i);
 		// logical -> physical conversion used by the widget
@@ -120,6 +126,32 @@ TEST(layout_1080p_and_variants)
 	checkLayoutInvariants(1280, 1400, 16.0 / 9.0, 1.0); // portrait-ish window
 	checkLayoutInvariants(1920, 960, 4.0 / 3.0, 1.0);   // 4:3 canvas
 	checkLayoutInvariants(2560, 1000, 21.0 / 9.0, 1.25);
+}
+
+TEST(layout_any_camera_count)
+{
+	for (int cams = 4; cams <= 16; cams++) {
+		checkLayoutInvariants(1920, 960, 16.0 / 9.0, 1.0, cams);
+		checkLayoutInvariants(1920, 960, 16.0 / 9.0, 1.5, cams);
+		checkLayoutInvariants(3840, 2000, 16.0 / 9.0, 1.0, cams);
+		checkLayoutInvariants(1280, 1400, 16.0 / 9.0, 1.0, cams);
+		checkLayoutInvariants(1200, 700, 16.0 / 9.0, 1.0, cams);
+	}
+	// 16 cameras on a 1080p monitor: still usable monitors and tiles.
+	LayoutInput in;
+	in.width = 1915;
+	in.height = 850;
+	in.cameraCount = 16;
+	Layout l = computeLayout(in);
+	CHECK(l.valid);
+	CHECK(l.panes[kPanePreview].video.w >= 600);
+	CHECK(l.panes[kPaneCam1 + 15].video.w >= 150);
+	// 8 cameras keep the original arrangement exactly (wide: 4 cameras + 2 extras per row).
+	in.cameraCount = 8;
+	Layout eight = computeLayout(in);
+	CHECK(eight.panes[kPaneReplay].outer.y == eight.panes[kPaneCam1].outer.y);
+	CHECK(eight.panes[kPaneCam1 + 4].outer.y == eight.panes[kPaneHighlights].outer.y);
+	CHECK(eight.panes[kPaneCam1 + 3].outer.x < eight.panes[kPaneReplay].outer.x);
 }
 
 TEST(layout_uses_space_at_1080p)
@@ -188,6 +220,8 @@ TEST(layout_modes_all_valid)
 				Layout l = computeLayout(in);
 				CHECK(l.valid);
 				for (int i = 0; i < kPaneCount; i++) {
+					if (!paneInUse(i, in.cameraCount))
+						continue;
 					CHECK(rectInside(l.panes[i].outer, w, h));
 					for (int j = i + 1; j < kPaneCount; j++)
 						CHECK(!overlaps(l.panes[i].outer, l.panes[j].outer));
@@ -232,7 +266,16 @@ TEST(slot_kinds)
 	CHECK(!slotIsPlayback(kSlotIntermission) && !slotIsPlayback(3));
 	CHECK(slotIsReplayCue(kSlotReplay) && slotIsReplayCue(kSlotHighlights));
 	CHECK(!slotIsReplayCue(kSlotAds) && !slotIsReplayCue(kSlotIntermission));
-	CHECK(slotIsIntermission(kSlotIntermission) && kSlotCount == 12);
+	CHECK(slotIsIntermission(kSlotIntermission) && kSlotCount == kMaxCameras + 4);
+	CHECK(slotIsCamera(15) && !slotIsCamera(16));
+	// A camera beyond the configured number cannot be selected.
+	SelectFacts off;
+	off.studioMode = true;
+	off.slot = 11;
+	off.slotFacts.inUse = false;
+	off.slotFacts.sceneExists = true;
+	off.slotFacts.inputAssigned = off.slotFacts.inputExists = true;
+	CHECK(evaluateSelect(off) == Reject::CameraNotInUse);
 	// Intermission and Ads are selectable when their scene exists; Ads needs to be armed.
 	SelectFacts f;
 	f.studioMode = true;
@@ -354,9 +397,6 @@ TEST(cut_rules)
 	f.studioMode = false;
 	CHECK(evaluateCut(f).reason == Reject::StudioModeOff);
 	f = cutOk();
-	f.previewOverrideConflict = true;
-	CHECK(evaluateCut(f).reason == Reject::TransitionOverride);
-	f = cutOk();
 	f.cutTransitionAvailable = false;
 	CHECK(evaluateCut(f).reason == Reject::NoCutTransition);
 	f = cutOk();
@@ -411,6 +451,13 @@ TEST(take_state_machine_suppresses_repeats)
 	t.complete();
 	t.complete();
 	CHECK(t.state() == TakeStateMachine::State::Idle);
+	// a long transition (3 s fade): the take stays serialized until it can have finished
+	t.setTimeoutMs(5000);
+	CHECK(t.tryBegin(10000));
+	CHECK(!t.tick(13000));
+	CHECK(t.busy());
+	CHECK(t.tick(15001));
+	CHECK(!t.busy());
 }
 
 TEST(last_camera_tracker)
@@ -460,9 +507,6 @@ TEST(return_live_rules)
 	g = f;
 	g.busy = true;
 	CHECK(evaluateReturnLive(g).reason == Reject::Busy);
-	g = f;
-	g.targetOverrideConflict = true;
-	CHECK(evaluateReturnLive(g).reason == Reject::TransitionOverride);
 	CHECK(std::string(rejectMessage(Reject::NoTarget)).size() > 5);
 }
 
@@ -847,7 +891,7 @@ TEST(config_extra_cameras_ignored)
 	obs_data_t *d = obs_data_create();
 	obs_data_set_int(d, "version", 2);
 	obs_data_array_t *arr = obs_data_array_create();
-	for (int i = 0; i < 12; i++) {
+	for (int i = 0; i < 20; i++) {
 		obs_data_t *c = obs_data_create();
 		obs_data_set_string(c, "label", ("L" + std::to_string(i)).c_str());
 		obs_data_array_push_back(arr, c);
@@ -858,6 +902,31 @@ TEST(config_extra_cameras_ignored)
 	BankConfig c = loadConfig(d, "b");
 	obs_data_release(d);
 	CHECK_EQ(c.cameras[7].label, std::string("L7"));
+	CHECK_EQ(c.cameras[15].label, std::string("L15")); // entries beyond 16 are ignored
+	CHECK_EQ(c.cameraCount, 8);                        // no camera_count saved: 8 (1.4 and older)
+}
+
+TEST(config_camera_count)
+{
+	BankConfig c = makeDefaultConfig("b");
+	CHECK_EQ(c.cameraCount, 8);
+	CHECK_EQ(c.cameras[8].sceneName, std::string("MF — CAM 09"));
+	CHECK_EQ(c.cameras[15].sceneName, std::string("MF — CAM 16"));
+	CHECK(c.cameraInUse(7) && !c.cameraInUse(8));
+	c.cameraCount = 12;
+	c.cameras[11].label = "Drone";
+	obs_data_t *d = obs_data_create();
+	saveConfig(c, d);
+	obs_data_t *d2 = obs_data_create_from_json(obs_data_get_json(d));
+	BankConfig r = loadConfig(d2, "x");
+	obs_data_release(d2);
+	obs_data_release(d);
+	CHECK_EQ(r.cameraCount, 12);
+	CHECK_EQ(r.cameras[11].label, std::string("Drone"));
+	CHECK(r.cameraInUse(11) && !r.cameraInUse(12));
+	CHECK_EQ(clampCameraCount(2), 4);
+	CHECK_EQ(clampCameraCount(40), 16);
+	CHECK_EQ(clampCameraCount(10), 10);
 }
 
 TEST(redact_url)

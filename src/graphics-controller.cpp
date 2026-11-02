@@ -29,7 +29,7 @@ GraphicsVisibility GraphicsController::visibility(int *itemCount) const
 	if (!browser)
 		return GraphicsVisibility::NotSetUp;
 	int on = 0, off = 0;
-	for (int cam = 0; cam < 8; cam++) {
+	for (int cam = 0; cam < bank_.config().cameraCount; cam++) {
 		OBSSourceAutoRelease scene = bank_.slotScene(cam);
 		obs_sceneitem_t *item = bank_.graphicsItem(cam, obs_scene_from_source(scene), browser);
 		if (!item)
@@ -52,7 +52,7 @@ int GraphicsController::setVisible(bool visible)
 	if (!browser)
 		return 0;
 	int n = 0;
-	for (int cam = 0; cam < 8; cam++) {
+	for (int cam = 0; cam < bank_.config().cameraCount; cam++) {
 		OBSSourceAutoRelease scene = bank_.slotScene(cam);
 		obs_scene_t *s = obs_scene_from_source(scene);
 		obs_sceneitem_t *item = bank_.graphicsItem(cam, s, browser);
